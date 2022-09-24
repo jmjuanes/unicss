@@ -43,6 +43,23 @@ describe("[core] create", () => {
         expect(outputCss).toEqual(expect.stringContaining("{color:red;}"));
     });
 
+    it("(css) should allow to provide custom properties", () => {
+        const uni = create({
+            properties: {
+                size: value => ({
+                    height: value,
+                    width: value,
+                }),
+            },
+        });
+        const element = uni.css({
+            size: "1px",
+        });
+        const name = element();
+        const styles = uni.extractCss();
+
+        expect(styles).toEqual(expect.stringContaining(`.${name} {height:1px;width:1px;}`));
+    });
 });
 
 describe("[core] merge", () => {

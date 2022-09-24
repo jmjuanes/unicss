@@ -35,11 +35,24 @@ const wrapRule = (ruleName, ruleContent, separator) => {
 };
 
 // Parse CSS property
-const parseProp = (prop, config) => {
-    // return (aliases[prop] || [prop]).map(item => {
-    return [prop].map(item => {
-        return item.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`);
-    })
+const parseProp = (prop, value, config) => {
+    let propsToParse = {
+        [prop]: value,
+    };
+
+    // Check if custom properties object has been provided
+    if (typeof config?.properties?.[prop] === "function") {
+        const newProps = config.properties[prop](value);
+        if (newProps && typeof newProps === "object") {
+            propsToParse = newProps;
+        }
+    }
+
+    // Parse props
+    return Object.keys(propsToParse).map(item => ([
+        item.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`),
+        propsToParse[item],
+    ]));
 };
 
 // Parse CSS value
@@ -95,9 +108,9 @@ export const transform = (selector, styles, config) => {
             );
         }
 
-        // Other value --> append to the current css
-        parseProp(key, config).forEach(prop => {
-            result[0] = result[0] + `${prop}:${parseValue(key, value, config)};`;
+        // Just parse as a simple property
+        parseProp(key, value, config).forEach(([prop, value]) => {
+            result[0] = result[0] + `${prop}:${parseValue(prop, value, config)};`;
         });
     });
 
@@ -122,7 +135,7 @@ const createCssFunction = (styles, config) => {
         const hash = hashCode(css);
 
         // Save to cache and return the classname
-        config.target.innerHTML = config.target.innerHTML + css.replaceAll("__uni__", hash);
+        config.target.innerHTML = config.target.innerHTML + css.replaceAll("__uni__", hash) + "\n";
         cache.set(variant || "default", hash);
 
         return hash;
