@@ -1,3 +1,52 @@
+// Default theme scales mapping
+export const defaultThemeMap = {
+    backgroundColor: "colors",
+    borderColor: "colors",
+    borderBottomColor: "colors",
+    borderLeftColor: "colors",
+    borderRightColor: "colors",
+    borderTopColor: "colors",
+    borderRadius: "radius",
+    borderBottomLeftRadius: "radius",
+    borderBottomRightRadius: "radius",
+    borderTopLeftRadius: "radius",
+    borderTopRightRadius: "radius",
+    borderWidth: "sizes",
+    borderBottomWidth: "sizes",
+    borderLeftWidth: "sizes",
+    borderRightWidth: "sizes",
+    borderTopWidth: "sizes",
+    bottom: "spacing",
+    boxShadow: "shadows",
+    color: "colors",
+    fill: "colors",
+    fontFamily: "fonts",
+    fontSize: "fontSizes",
+    fontWeight: "fontWeights",
+    height: "sizes",
+    left: "spacing",
+    lineHeight: "lineHeights",
+    margin: "spacing",
+    marginBottom: "spacing",
+    marginLeft: "spacing",
+    marginRight: "spacing",
+    marginTop: "spacing",
+    maxHeight: "sizes",
+    maxWidth: "sizes",
+    minHeight: "sizes",
+    minWidth: "sizes",
+    opacity: "opacities",
+    padding: "spacing",
+    paddingBottom: "spacing",
+    paddingLeft: "spacing",
+    paddingRight: "spacing",
+    paddingTop: "spacing",
+    right: "spacing",
+    textShadow: "shadows",
+    top: "spacing",
+    width: "sizes",
+};
+
 const hashCode = str => {
     return "uni-" + Math.abs(Array.from(str).reduce((s, c) => Math.imul(31, s) + c.charCodeAt(0) | 0, 0)).toString();
 };
@@ -57,23 +106,17 @@ const parseProp = (prop, value, config) => {
 
 // Parse CSS value
 const parseValue = (prop, value, config) => {
-    // const values = [value].flat(1);
-    // if (values[0] === "value" && typeof vars["value"] !== "undefined") {
-    //     values[0] = vars["value"]; // Replace value for vars
-    // }
-    // if (scales[property] && typeof values[0] === "string") {
-    //     const key = scales[property];
-    //     if (config[key]?.[values[0]]) {
-    //         // only colors and fonts are allowed to generate css variables
-    //         if (config.useCssVariables && cssVariablesNames[key]) {
-    //             values[0] = `var(${getCssVariable(key, values[0])})`;
-    //         }
-    //         else {
-    //             values[0] = config[key][values[0]];
-    //         }
-    //     }
-    // }
-    // return values.join(" ");
+    if (typeof value === "string" && value.indexOf("$") > -1 && defaultThemeMap[prop]) {
+        const scaleName = defaultThemeMap[prop];
+        const scale = config?.theme?.[scaleName];
+
+        if (scale && typeof scale === "object") {
+            return value.replace(/\$([^\s]+)/g, (match, key) => {
+                return typeof scale[key] !== "undefined" ? scale[key].toString() : match;
+            });
+        }
+    }
+    
     return value;
 };
 

@@ -60,6 +60,29 @@ describe("[core] create", () => {
 
         expect(styles).toEqual(expect.stringContaining(`.${name} {height:1px;width:1px;}`));
     });
+
+    it("(css) should use theme values", () => {
+        const uni = create({
+            theme: {
+                colors: {
+                    primary: "blue",
+                    secondary: "red",
+                },
+                sizes: {
+                    "none": "0px",
+                },
+            },
+        });
+
+        const element = uni.css({
+            color: "$primary !important",
+            width: "$none",
+        });
+        const name = element();
+        const styles = uni.extractCss();
+
+        expect(styles).toEqual(expect.stringContaining(`.${name} {color:blue !important;width:0px;}`));
+    });
 });
 
 describe("[core] merge", () => {
