@@ -1,4 +1,8 @@
-import {create, merge, classNames} from "@unicss/core";
+import {
+    createUni,
+    merge,
+    classNames,
+} from "@unicss/core";
 
 describe("[core] create", () => {
     it("should create a new instance of uniCSS", () => {
@@ -7,7 +11,7 @@ describe("[core] create", () => {
                 white: "#fff",
             },
         };
-        const uni = create({
+        const uni = createUni({
             theme: theme,
         });
 
@@ -19,42 +23,27 @@ describe("[core] create", () => {
     });
 
     it("(extractCss) should return the saved styles", () => {
-        const uni = create({});
+        const uni = createUni({});
 
         expect(uni.extractCss()).toBe("");
     });
 
     it("(css) should return a valid classname", () => {
-        const uni = create({});
-
-        const css1 = uni.css({});
-        const css2 = uni.css({
+        const uni = createUni({});
+        const element1 = uni.css({});
+        const element2 = uni.css({
             color: "white",
         });
-        const css3 = uni.css({
-            color: "blue",
-            variants: {
-                variant1: {
-                    color: "red",
-                },
-            },
-        });
+        const styles = uni.extractCss();
 
-        expect(css1()).toBe("uni-1529383744");
-        expect(css2()).not.toBe("");
-        expect(css3()).not.toBe("");
-        expect(css3("variant1")).not.toBe(css3());
-
-        const outputCss = uni.extractCss();
-
-        expect(outputCss).not.toBe("");
-        expect(outputCss).toEqual(expect.stringContaining("{color:white;}"));
-        expect(outputCss).toEqual(expect.stringContaining("{color:blue;}"));
-        expect(outputCss).toEqual(expect.stringContaining("{color:red;}"));
+        expect(element1).toBe("uni-1529383744");
+        expect(element2).not.toBe("");
+        expect(styles).not.toBe("");
+        expect(styles).toEqual(expect.stringContaining("{color:white;}"));
     });
 
     it("(css) should allow to provide custom properties", () => {
-        const uni = create({
+        const uni = createUni({
             properties: {
                 size: value => ({
                     height: value,
@@ -65,14 +54,13 @@ describe("[core] create", () => {
         const element = uni.css({
             size: "1px",
         });
-        const name = element();
         const styles = uni.extractCss();
 
-        expect(styles).toEqual(expect.stringContaining(`.${name} {height:1px;width:1px;}`));
+        expect(styles).toEqual(expect.stringContaining(`.${element} {height:1px;width:1px;}`));
     });
 
     it("(css) should use theme values", () => {
-        const uni = create({
+        const uni = createUni({
             theme: {
                 colors: {
                     primary: "blue",
@@ -87,14 +75,13 @@ describe("[core] create", () => {
             color: "$primary !important",
             width: "$none",
         });
-        const name = element();
         const styles = uni.extractCss();
 
-        expect(styles).toEqual(expect.stringContaining(`.${name} {color:blue !important;width:0px;}`));
+        expect(styles).toEqual(expect.stringContaining(`.${element} {color:blue !important;width:0px;}`));
     });
 
     it("(css) should apply mixins", () => {
-        const uni = create({
+        const uni = createUni({
             mixins: {
                 test1: {
                     applied1: "test1",
@@ -110,15 +97,14 @@ describe("[core] create", () => {
             apply: ["test1", "test2"],
             margin: "0px",
         });
-        const name = element();
         const styles = uni.extractCss();
 
-        expect(name).not.toBe("");
+        expect(element).not.toBe("");
         expect(styles).toEqual(expect.stringContaining("{margin:2px;applied1:test1;applied2:test2;}"));
     });
 
     it("(keyframes) should parse and generate keyframes", () => {
-        const uni = create({});
+        const uni = createUni({});
         const name = uni.keyframes({
             from: {opacity: 0},
             to: {opacity: 1},
@@ -130,8 +116,8 @@ describe("[core] create", () => {
     });
 
     it("(globalCss) should generate global styles", () => {
-        const uni = create({});
-        const name = uni.globalCss({
+        const uni = createUni({});
+        uni.globalCss({
             "html": {
                 backgroundColor: "white",
             },
@@ -143,14 +129,20 @@ describe("[core] create", () => {
                 "source1",
                 "source2",
             ],
+            "@fontFace": [
+                {src: "source-font1"},
+                {src: "source-font2"},
+            ],
         });
         const styles = uni.extractCss();
 
-        expect(name).toBe("");
+        // expect(name).toBe("");
         expect(styles).toEqual(expect.stringContaining("html {background-color:white;}"));
         expect(styles).toEqual(expect.stringContaining("@keyframes test-anim"));
         expect(styles).toEqual(expect.stringContaining("@import source1;"));
         expect(styles).toEqual(expect.stringContaining("@import source2;"));
+        expect(styles).toEqual(expect.stringContaining("@font-face {src:source-font1;}"));
+        expect(styles).toEqual(expect.stringContaining("@font-face {src:source-font2;}"));
     });
 });
 
