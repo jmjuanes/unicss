@@ -51,6 +51,14 @@ const hashCode = str => {
     return "uni-" + Math.abs(Array.from(str).reduce((s, c) => Math.imul(31, s) + c.charCodeAt(0) | 0, 0)).toString();
 };
 
+// Exclude a field from the specified object
+const exclude = (obj, field) => {
+    return Object.fromEntries(Object.entries(obj).filter(e => e[0] !== field));
+};
+
+// Tiny reducer alias
+const toObject = (list, fn) => list.reduce(fn, {});
+
 // Get value in object from path
 export const get = (obj, path) => {
     return path.split(".").reduce((o, p) => o?.[p], obj);
@@ -120,19 +128,45 @@ const parseValue = (prop, value, config) => {
     return value;
 };
 
+// Parse mixins
+const parseMixins = (styles, config, prev) => {
+    prev = prev || new Set();
+    if (config?.mixins && styles?.apply && (typeof styles.apply === "string" || Array.isArray(styles.apply))) {
+        const mixinsList = [styles.apply].flat().filter(n => {
+            return n && typeof n === "string";
+        });
+
+        return {
+            ...exclude(styles, "apply"),
+            ...toObject(mixinsList, (newStyles, mixinName) => {
+                // Check for circular mixins found
+                if (prev.has(mixinName)) {
+                    // const items = Array.from(prev);
+                    // throw new Error(`Circular mixins found: ${items.join("->")}->${mixinName}`);
+                    return newStyles;
+                }
+
+                // Apply styles from this mixin
+                prev.add(mixinName);
+                return {
+                    ...newStyles,
+                    ...parseMixins(get(config?.mixins || {}, mixinName), config, prev),
+                };
+            }),
+        };
+    }
+
+    // No mixins to apply --> return styles
+    return styles || {};
+};
+
 // Main transform
 export const transform = (selector, styles, config) => {
-    // Check for mixins to apply to this styles
-    // if (styles.apply) {
-    //     return buildRule(parent, buildMixin(styles, config), config, vars);
-    // }
     const result = [""];
-    Object.keys(styles).forEach(key => {
-        const value = styles[key];
-
-        // skip content in the 'variants' key of the styles object
-        // as is reserved only to register variants
-        if (key === "variants" || value === null) {
+    Object.entries(parseMixins(styles, config)).forEach(([key, value]) => {
+        // skip content in the 'variants' key: reserved only to register variants
+        // Skip content in the 'apply' key: reserved only to mixins
+        if (key === "variants" || key === "apply" || value === null) {
             return;
         }
 
@@ -185,6 +219,24 @@ const createCssFunction = (styles, config) => {
     };
 };
 
+const createKeyframes = (styles, config) => {
+    const css = wrapRule(
+        "@keyframes __uni__",
+        Object.keys(styles).map(k => transform(k, styles[k], config)).join(" "),
+    );
+    const hash = hashCode(css);
+
+    // Check for saving keyframes definition in target
+    // As at this moment we are not saving a cache of css rules, we need to check
+    // if the generated hash is defined in the target
+    if (config.target?.innerHTML?.indexOf(`@keyframes ${hash}`) < 0) {
+        config.target.innerHTML = config.target.innerHTML + css.replaceAll("__uni__", hash) + "\n";
+    }
+
+    // Return generated keyframes name
+    return hash;
+};
+
 const createTarget = key => {
     // Check if we are in a DOM env
     if (typeof document !== "undefined") {
@@ -198,7 +250,8 @@ const createTarget = key => {
         return target;
     }
 
-    // Default: return a fake <style> tag
+    // Other case: we are not in an env supporting DOM (maybe SSR)
+    // return a fake <style> tag
     return {
         innerHTML: "",
     };
@@ -211,6 +264,7 @@ export const create = config => {
 
     return {
         css: styles => createCssFunction(styles, config),
+        keyframes: styles => createKeyframes(styles, config),
         extractCss: () => config.target?.innerHTML || "",
     };
 };

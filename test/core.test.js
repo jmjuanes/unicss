@@ -5,6 +5,7 @@ describe("[core] create", () => {
         const uni = create({});
 
         expect(uni.css).toBeDefined();
+        expect(uni.keyframes).toBeDefined();
         expect(uni.extractCss).toBeDefined();
     });
 
@@ -69,11 +70,10 @@ describe("[core] create", () => {
                     secondary: "red",
                 },
                 sizes: {
-                    "none": "0px",
+                    none: "0px",
                 },
             },
         });
-
         const element = uni.css({
             color: "$primary !important",
             width: "$none",
@@ -82,6 +82,42 @@ describe("[core] create", () => {
         const styles = uni.extractCss();
 
         expect(styles).toEqual(expect.stringContaining(`.${name} {color:blue !important;width:0px;}`));
+    });
+
+    it("(css) should apply mixins", () => {
+        const uni = create({
+            mixins: {
+                test1: {
+                    applied1: "test1",
+                    margin: "1px",
+                },
+                test2: {
+                    applied2: "test2",
+                    margin: "2px",
+                },
+            },
+        });
+        const element = uni.css({
+            apply: ["test1", "test2"],
+            margin: "0px",
+        });
+        const name = element();
+        const styles = uni.extractCss();
+
+        expect(name).not.toBe("");
+        expect(styles).toEqual(expect.stringContaining("{margin:2px;applied1:test1;applied2:test2;}"));
+    });
+
+    it("(keyframes) should parse and generate keyframes", () => {
+        const uni = create({});
+        const name = uni.keyframes({
+            from: {opacity: 0},
+            to: {opacity: 1},
+        });
+        const styles = uni.extractCss();
+
+        expect(name).not.toBe("");
+        expect(styles).toEqual(expect.stringContaining(`@keyframes ${name} {from {opacity:0;} to {opacity:1;}}`));
     });
 });
 
