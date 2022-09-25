@@ -253,6 +253,10 @@ const createGlobalCss = (styles, config, cache) => {
         else if (key.trim() === "@import") {
             return [value].flat().map(v => `@import ${v};`);
         }
+        // Check for @font-face rule
+        else if (["@fontFace", "@fontface", "@font-face"].indexOf(key) > -1) {
+            return transform("@font-face", value, config);
+        }
 
         // Other value --> parse as regular classname
         return transform(key, value, config);
