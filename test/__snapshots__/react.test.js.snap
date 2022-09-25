@@ -1,0 +1,23 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`Box should render 1`] = `
+<div
+  className="uni-655233114"
+>
+  Hello world
+</div>
+`;
+
+exports[`UniProvider should render 1`] = `
+<div>
+  Hello world
+</div>
+`;
+
+exports[`styled should return a valid React component 1`] = `
+<div
+  className="uni-655233114"
+>
+  Hello world
+</div>
+`;
