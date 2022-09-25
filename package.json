@@ -4,7 +4,6 @@
     "private": true,
     "description": "",
     "author": "Josemi Juanes <hello@josemi.xyz>",
-    "type": "module",
     "license": "MIT",
     "homepage": "https://www.josemi.xyz/unicss",
     "repository": "https://github.com/jmjuanes/unicss",
