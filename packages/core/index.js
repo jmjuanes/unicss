@@ -247,17 +247,17 @@ const createTarget = key => {
 export const createUni = config => {
     const cache = new Set();
     config = config || {};
-    config.target = config.target || createTarget("css");
+    config.target = config.target || createTarget(config.key || "css");
 
     // Register css styles
-    const css = s => {
+    const createCss = s => {
         const styles = transformSelector(".__uni__", s, config).join("\n"); 
         const hash = hashCode(styles);
         return registerStyles(hash, styles, cache, config.target);
     };
 
     // Generate a keyframes styles
-    const keyframes = s => {
+    const createKeyframes = s => {
         const styles = wrapRule(
             "@keyframes __uni__",
             Object.keys(s).map(k => transformSelector(k, s[k], config)).join(" "),
@@ -267,16 +267,16 @@ export const createUni = config => {
     };
 
     // Generate global styles
-    const globalCss = s => {
+    const createGlobalCss = s => {
         const styles = transform(s, config);
         const hash = hashCode(styles);
         return registerStyles(hash, styles, cache, config.target);
     };
 
     return {
-        css,
-        globalCss,
-        keyframes,
+        css: createCss,
+        globalCss: createGlobalCss,
+        keyframes: createKeyframes,
         extractCss: () => config.target?.innerHTML || "",
         theme: config?.theme || {},
         target: config?.target,
