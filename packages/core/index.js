@@ -283,6 +283,17 @@ export const createUni = config => {
     };
 };
 
+// Cached instance
+let cachedInstance = null;
+const getCachedInstance = () => {
+    return cachedInstance || (cachedInstance = createUni({}));
+};
+
+export const css = s => getCachedInstance().css(s);
+export const globalCss = s => getCachedInstance().globalCss(s);
+export const keyframes = s => getCachedInstance().keyframes(s);
+export const extractCss = () => getCachedInstance().extractCss();
+
 // Tiny utility for conditionally joining classNames
 export const classNames = (...args) => {
     return (args || []).map(items => {
