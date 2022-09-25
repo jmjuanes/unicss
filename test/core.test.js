@@ -2,11 +2,20 @@ import {create, merge, classNames} from "@unicss/core";
 
 describe("[core] create", () => {
     it("should create a new instance of uniCSS", () => {
-        const uni = create({});
+        const theme = {
+            colors: {
+                white: "#fff",
+            },
+        };
+        const uni = create({
+            theme: theme,
+        });
 
         expect(uni.css).toBeDefined();
+        expect(uni.globalCss).toBeDefined();
         expect(uni.keyframes).toBeDefined();
         expect(uni.extractCss).toBeDefined();
+        expect(uni.theme).toBe(theme);
     });
 
     it("(extractCss) should return the saved styles", () => {
@@ -118,6 +127,30 @@ describe("[core] create", () => {
 
         expect(name).not.toBe("");
         expect(styles).toEqual(expect.stringContaining(`@keyframes ${name} {from {opacity:0;} to {opacity:1;}}`));
+    });
+
+    it("(globalCss) should generate global styles", () => {
+        const uni = create({});
+        const name = uni.globalCss({
+            "html": {
+                backgroundColor: "white",
+            },
+            "@keyframes test-anim": {
+                from: {left: "0px"},
+                to: {left: "100px"},
+            },
+            "@import": [
+                "source1",
+                "source2",
+            ],
+        });
+        const styles = uni.extractCss();
+
+        expect(name).toBe("");
+        expect(styles).toEqual(expect.stringContaining("html {background-color:white;}"));
+        expect(styles).toEqual(expect.stringContaining("@keyframes test-anim"));
+        expect(styles).toEqual(expect.stringContaining("@import source1;"));
+        expect(styles).toEqual(expect.stringContaining("@import source2;"));
     });
 });
 

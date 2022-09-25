@@ -162,6 +162,10 @@ const parseMixins = (styles, config, prev) => {
 
 // Main transform
 export const transform = (selector, styles, config) => {
+    if (styles && Array.isArray(styles)) {
+        return styles.map(s => transform(selector, s, config)).join("\n");
+    }
+
     const result = [""];
     Object.entries(parseMixins(styles, config)).forEach(([key, value]) => {
         // skip content in the 'variants' key: reserved only to register variants
@@ -219,22 +223,50 @@ const createCssFunction = (styles, config) => {
     };
 };
 
-const createKeyframes = (styles, config) => {
+const createKeyframes = (styles, config, cache) => {
     const css = wrapRule(
         "@keyframes __uni__",
         Object.keys(styles).map(k => transform(k, styles[k], config)).join(" "),
     );
     const hash = hashCode(css);
 
-    // Check for saving keyframes definition in target
-    // As at this moment we are not saving a cache of css rules, we need to check
-    // if the generated hash is defined in the target
-    if (config.target?.innerHTML?.indexOf(`@keyframes ${hash}`) < 0) {
+    // if (config.target?.innerHTML?.indexOf(`@keyframes ${hash}`) < 0) {
+    if (!cache.has(hash)) {
+        cache.add(hash);
         config.target.innerHTML = config.target.innerHTML + css.replaceAll("__uni__", hash) + "\n";
     }
 
     // Return generated keyframes name
     return hash;
+};
+
+const createGlobalCss = (styles, config, cache) => {
+    const result = Object.entries(styles || {}).map(([key, value]) => {
+        // Check for at rule (media or keyframes)
+        if (/^@(media|keyframes)/.test(key.trim())) {
+            return wrapRule(
+                key,
+                Object.keys(value).map(k => transform(k, value[k], config)).join(" "),
+            );
+        }
+        // Check for @import rule
+        else if (key.trim() === "@import") {
+            return [value].flat().map(v => `@import ${v};`);
+        }
+
+        // Other value --> parse as regular classname
+        return transform(key, value, config);
+    });
+
+    const css = result.flat().join("\n");
+    const hash = hashCode(css);
+
+    if (!cache.has(hash)) {
+        cache.add(hash);
+        config.target.innerHTML = config.target.innerHTML + css + "\n";
+    }
+
+    return "";
 };
 
 const createTarget = key => {
@@ -259,13 +291,16 @@ const createTarget = key => {
 
 // Create a new instance of UniCSS
 export const create = config => {
+    const cache = new Set();
     config = config || {};
     config.target = config.target || createTarget("css");
 
     return {
         css: styles => createCssFunction(styles, config),
-        keyframes: styles => createKeyframes(styles, config),
+        globalCss: styles => createGlobalCss(styles, config, cache),
+        keyframes: styles => createKeyframes(styles, config, cache),
         extractCss: () => config.target?.innerHTML || "",
+        theme: config?.theme || {},
     };
 };
 
