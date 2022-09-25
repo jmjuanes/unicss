@@ -1,0 +1,22 @@
+{
+    "name": "@unicss/react",
+    "version": "0.0.0",
+    "description": "React integration for UniCSS",
+    "author": "Josemi Juanes <hello@josemi.xyz>",
+    "type": "module",
+    "license": "MIT",
+    "repository": "https://github.com/jmjuanes/unicss",
+    "bugs": "https://github.com/jmjuanes/unicss/issues",
+    "homepage": "https://www.josemi.xyz/unicss",
+    "exports": "./index.js",
+    "keywords": [
+        "unicss",
+        "react"
+    ],
+    "dependencies": {
+        "@unicss/core": "^0.0.0"
+    },
+    "peerDependencies": {
+        "react": ">= 17"
+    }
+}
