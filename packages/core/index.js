@@ -96,7 +96,6 @@ const parseProp = (prop, value, config) => {
     let propsToParse = {
         [prop]: value,
     };
-
     // Check if custom properties object has been provided
     if (typeof config?.properties?.[prop] === "function") {
         const newProps = config.properties[prop](value);
@@ -104,7 +103,6 @@ const parseProp = (prop, value, config) => {
             propsToParse = newProps;
         }
     }
-
     // Parse props
     return Object.keys(propsToParse).map(item => ([
         item.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`),
@@ -124,7 +122,6 @@ const parseValue = (prop, value, config) => {
             });
         }
     }
-    
     return value;
 };
 
@@ -135,17 +132,12 @@ const parseMixins = (styles, config, prev) => {
         const mixinsList = [styles.apply].flat().filter(n => {
             return n && typeof n === "string";
         });
-
         return {
             ...exclude(styles, "apply"),
             ...toObject(mixinsList, (newStyles, mixinName) => {
-                // Check for circular mixins found
                 if (prev.has(mixinName)) {
-                    // const items = Array.from(prev);
-                    // throw new Error(`Circular mixins found: ${items.join("->")}->${mixinName}`);
                     return newStyles;
                 }
-
                 // Apply styles from this mixin
                 prev.add(mixinName);
                 return {
@@ -155,17 +147,15 @@ const parseMixins = (styles, config, prev) => {
             }),
         };
     }
-
-    // No mixins to apply --> return styles
+    // No mixins to apply
     return styles || {};
 };
 
-// Main transform
-export const transform = (selector, styles, config) => {
+// Transform a selector rule
+const transformSelector = (selector, styles, config) => {
     if (styles && Array.isArray(styles)) {
-        return styles.map(s => transform(selector, s, config)).join("\n");
+        return styles.map(s => transformSelector(selector, s, config)).flat();
     }
-
     const result = [""];
     Object.entries(parseMixins(styles, config)).forEach(([key, value]) => {
         // skip content in the 'variants' key: reserved only to register variants
@@ -173,104 +163,65 @@ export const transform = (selector, styles, config) => {
         if (key === "variants" || key === "apply" || value === null) {
             return;
         }
-
-        if (typeof value === "object" && Array.isArray(value) === false) {
+        // Nested styles or @media rules 
+        if (typeof value === "object") {
             // Media rules styles should be wrapped into a new rule
             if (/^@/.test(key)) {
                 return result.push(
-                    wrapRule(key, transform(selector, value, config), "\n"),
+                    wrapRule(key, transformSelector(selector, value, config), "\n"),
                 );
             }
-
             // Add nested styles
             // We should replace the & with the current selector
             return result.push(
-                transform(key.replaceAll("&", selector), value, config),
+                transformSelector(key.replaceAll("&", selector), value, config),
             );
         }
-
         // Just parse as a simple property
         parseProp(key, value, config).forEach(([prop, value]) => {
             result[0] = result[0] + `${prop}:${parseValue(prop, value, config)};`;
         });
     });
-
-    // result[0] contains the styles for the main selector, and should be wrapped into {}
+    // result[0] contains the styles for the current selector, and should be wrapped into {}
     result[0] = wrapRule(selector, result[0], "");
-
-    // Return joined CSS rules
-    return result.flat(2).join("\n");
+    return result.flat(2);
 };
 
-const createCssFunction = (styles, config) => {
-    const cache = new Map();
-    return variant => {
-        if (cache.has(variant || "default")) {
-            return cache.get(variant || "default");
-        }
-
-        const variantStyles = {
-            ...(styles?.variants?.[variant || "default"] || {}),
-        };
-        const css = transform(".__uni__", merge(styles, variantStyles), config); 
-        const hash = hashCode(css);
-
-        // Save to cache and return the classname
-        config.target.innerHTML = config.target.innerHTML + css.replaceAll("__uni__", hash) + "\n";
-        cache.set(variant || "default", hash);
-
-        return hash;
-    };
-};
-
-const createKeyframes = (styles, config, cache) => {
-    const css = wrapRule(
-        "@keyframes __uni__",
-        Object.keys(styles).map(k => transform(k, styles[k], config)).join(" "),
-    );
-    const hash = hashCode(css);
-
-    // if (config.target?.innerHTML?.indexOf(`@keyframes ${hash}`) < 0) {
-    if (!cache.has(hash)) {
-        cache.add(hash);
-        config.target.innerHTML = config.target.innerHTML + css.replaceAll("__uni__", hash) + "\n";
-    }
-
-    // Return generated keyframes name
-    return hash;
-};
-
-const createGlobalCss = (styles, config, cache) => {
+// Transform a styles object to string
+export const transform = (styles, config) => {
     const result = Object.entries(styles || {}).map(([key, value]) => {
-        // Check for at rule (media or keyframes)
-        if (/^@(media|keyframes)/.test(key.trim())) {
-            return wrapRule(
-                key,
-                Object.keys(value).map(k => transform(k, value[k], config)).join(" "),
-            );
+        // Check for at rule
+        if (key.startsWith("@")) {
+            // Check for @import rule, just add one @import for each source
+            // value must be a string or an array of strings
+            if (key === "@import") {
+                return [value].flat().map(v => `@import ${v};`);
+            }
+            // Check for @font-face rule
+            else if (["@fontFace", "@fontface", "@font-face"].indexOf(key) > -1) {
+                return transformSelector("@font-face", value, config);
+            }
+            // if (/^@(media|keyframes)/.test(key.trim())) {
+            else {
+                // Other rule (for example @media or @keyframes)
+                const rules = Object.keys(value).map(k => {
+                    return transformSelector(k, value[k], config);
+                });
+                return wrapRule(key, rules.join(" "));
+            }
         }
-        // Check for @import rule
-        else if (key.trim() === "@import") {
-            return [value].flat().map(v => `@import ${v};`);
-        }
-        // Check for @font-face rule
-        else if (["@fontFace", "@fontface", "@font-face"].indexOf(key) > -1) {
-            return transform("@font-face", value, config);
-        }
-
         // Other value --> parse as regular classname
-        return transform(key, value, config);
+        return transformSelector(key, value, config);
     });
+    return result.flat().join("\n");
+};
 
-    const css = result.flat().join("\n");
-    const hash = hashCode(css);
-
+const registerStyles = (hash, css, cache, target) => {
     if (!cache.has(hash)) {
+        target.innerHTML = target.innerHTML + css.replaceAll("__uni__", hash) + "\n";
         cache.add(hash);
-        config.target.innerHTML = config.target.innerHTML + css + "\n";
     }
-
-    return "";
+    return hash;
 };
 
 const createTarget = key => {
@@ -285,7 +236,6 @@ const createTarget = key => {
         }
         return target;
     }
-
     // Other case: we are not in an env supporting DOM (maybe SSR)
     // return a fake <style> tag
     return {
@@ -294,35 +244,57 @@ const createTarget = key => {
 };
 
 // Create a new instance of UniCSS
-export const create = config => {
+export const createUni = config => {
     const cache = new Set();
     config = config || {};
     config.target = config.target || createTarget("css");
 
+    // Register css styles
+    const css = s => {
+        const styles = transformSelector(".__uni__", s, config).join("\n"); 
+        const hash = hashCode(styles);
+        return registerStyles(hash, styles, cache, config.target);
+    };
+
+    // Generate a keyframes styles
+    const keyframes = s => {
+        const styles = wrapRule(
+            "@keyframes __uni__",
+            Object.keys(s).map(k => transformSelector(k, s[k], config)).join(" "),
+        );
+        const hash = hashCode(styles);
+        return registerStyles(hash, styles, cache, config.target);
+    };
+
+    // Generate global styles
+    const globalCss = s => {
+        const styles = transform(s, config);
+        const hash = hashCode(styles);
+        return registerStyles(hash, styles, cache, config.target);
+    };
+
     return {
-        css: styles => createCssFunction(styles, config),
-        globalCss: styles => createGlobalCss(styles, config, cache),
-        keyframes: styles => createKeyframes(styles, config, cache),
+        css,
+        globalCss,
+        keyframes,
         extractCss: () => config.target?.innerHTML || "",
         theme: config?.theme || {},
+        target: config?.target,
     };
 };
 
 // Tiny utility for conditionally joining classNames
-const parseClassNames = items => {
-    if (typeof items === "string") {
-        return items.split(" ").filter(item => item.length);
-    }
-    else if (Array.isArray(items)) {
-        return items.filter(item => typeof item === "string" && item.length); 
-    }
-    else if (typeof items === "object") {
-        return Object.keys(items || {}).filter(key => !!items[key]);
-    }
-    //Over value --> return an empty array
-    return [];
-};
-
 export const classNames = (...args) => {
-    return (args || []).map(arg => parseClassNames(arg)).flat().join(" ");
+    return (args || []).map(items => {
+        if (typeof items === "string") {
+            return items.split(" ").filter(item => item.length);
+        }
+        else if (Array.isArray(items)) {
+            return items.filter(item => typeof item === "string" && item.length); 
+        }
+        else if (typeof items === "object") {
+            return Object.keys(items || {}).filter(key => !!items[key]);
+        }
+        return [];
+    }).flat().join(" ");
 };
