@@ -1,5 +1,5 @@
 // Default theme scales mapping
-export const defaultThemeMap = {
+export const defaultThemeMappings = {
     backgroundColor: "colors",
     borderColor: "colors",
     borderBottomColor: "colors",
@@ -16,7 +16,7 @@ export const defaultThemeMap = {
     borderLeftWidth: "sizes",
     borderRightWidth: "sizes",
     borderTopWidth: "sizes",
-    bottom: "spacing",
+    bottom: "space",
     boxShadow: "shadows",
     color: "colors",
     fill: "colors",
@@ -24,27 +24,36 @@ export const defaultThemeMap = {
     fontSize: "fontSizes",
     fontWeight: "fontWeights",
     height: "sizes",
-    left: "spacing",
+    left: "space",
     lineHeight: "lineHeights",
-    margin: "spacing",
-    marginBottom: "spacing",
-    marginLeft: "spacing",
-    marginRight: "spacing",
-    marginTop: "spacing",
+    margin: "space",
+    marginBottom: "space",
+    marginLeft: "space",
+    marginRight: "space",
+    marginTop: "space",
     maxHeight: "sizes",
     maxWidth: "sizes",
     minHeight: "sizes",
     minWidth: "sizes",
     opacity: "opacities",
-    padding: "spacing",
-    paddingBottom: "spacing",
-    paddingLeft: "spacing",
-    paddingRight: "spacing",
-    paddingTop: "spacing",
-    right: "spacing",
+    padding: "space",
+    paddingBottom: "space",
+    paddingLeft: "space",
+    paddingRight: "space",
+    paddingTop: "space",
+    right: "space",
     textShadow: "shadows",
-    top: "spacing",
+    top: "space",
     width: "sizes",
+};
+
+// Default theme aliases
+export const defaultThemeAliases = {
+    h: "height",
+    p: "padding",
+    m: "margin",
+    size: ["height", "width"],
+    w: "width",
 };
 
 const hashCode = str => {
@@ -92,29 +101,20 @@ const wrapRule = (ruleName, ruleContent, separator) => {
 };
 
 // Parse CSS property
-const parseProp = (prop, value, config) => {
-    let propsToParse = {
-        [prop]: value,
-    };
-    // Check if custom properties object has been provided
-    if (typeof config?.properties?.[prop] === "function") {
-        const newProps = config.properties[prop](value);
-        if (newProps && typeof newProps === "object") {
-            propsToParse = newProps;
-        }
+const parseProp = (prop, theme) => {
+    let propsToParse = [prop];
+    if (theme?.aliases?.[prop]) {
+        propsToParse = [theme.aliases[prop]].flat();
     }
     // Parse props
-    return Object.keys(propsToParse).map(item => ([
-        item.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`),
-        propsToParse[item],
-    ]));
+    return propsToParse.map(item => item.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`));
 };
 
 // Parse CSS value
-const parseValue = (prop, value, config) => {
-    if (typeof value === "string" && value.indexOf("$") > -1 && defaultThemeMap[prop]) {
-        const scaleName = defaultThemeMap[prop];
-        const scale = config?.theme?.[scaleName];
+const parseValue = (prop, value, theme) => {
+    if (typeof value === "string" && value.indexOf("$") > -1 && defaultThemeMappings[prop]) {
+        const scaleName = defaultThemeMappings[prop];
+        const scale = theme?.scales?.[scaleName];
 
         if (scale && typeof scale === "object") {
             return value.replace(/\$([^\s]+)/g, (match, key) => {
@@ -126,9 +126,9 @@ const parseValue = (prop, value, config) => {
 };
 
 // Parse mixins
-const parseMixins = (styles, config, prev) => {
+const parseMixins = (styles, theme, prev) => {
     prev = prev || new Set();
-    if (config?.mixins && styles?.apply && (typeof styles.apply === "string" || Array.isArray(styles.apply))) {
+    if (theme?.mixins && styles?.apply && (typeof styles.apply === "string" || Array.isArray(styles.apply))) {
         const mixinsList = [styles.apply].flat().filter(n => {
             return n && typeof n === "string";
         });
@@ -142,7 +142,7 @@ const parseMixins = (styles, config, prev) => {
                 prev.add(mixinName);
                 return {
                     ...newStyles,
-                    ...parseMixins(get(config?.mixins || {}, mixinName), config, prev),
+                    ...parseMixins(get(theme?.mixins || {}, mixinName), theme, prev),
                 };
             }),
         };
@@ -152,12 +152,12 @@ const parseMixins = (styles, config, prev) => {
 };
 
 // Transform a selector rule
-const transformSelector = (selector, styles, config) => {
+const transformSelector = (selector, styles, theme) => {
     if (styles && Array.isArray(styles)) {
-        return styles.map(s => transformSelector(selector, s, config)).flat();
+        return styles.map(s => transformSelector(selector, s, theme)).flat();
     }
     const result = [""];
-    Object.entries(parseMixins(styles, config)).forEach(([key, value]) => {
+    Object.entries(parseMixins(styles, theme)).forEach(([key, value]) => {
         // skip content in the 'variants' key: reserved only to register variants
         // Skip content in the 'apply' key: reserved only to mixins
         if (key === "variants" || key === "apply" || value === null) {
@@ -168,18 +168,18 @@ const transformSelector = (selector, styles, config) => {
             // Media rules styles should be wrapped into a new rule
             if (/^@/.test(key)) {
                 return result.push(
-                    wrapRule(key, transformSelector(selector, value, config), "\n"),
+                    wrapRule(key, transformSelector(selector, value, theme), "\n"),
                 );
             }
             // Add nested styles
             // We should replace the & with the current selector
             return result.push(
-                transformSelector(key.replaceAll("&", selector), value, config),
+                transformSelector(key.replaceAll("&", selector), value, theme),
             );
         }
         // Just parse as a simple property
-        parseProp(key, value, config).forEach(([prop, value]) => {
-            result[0] = result[0] + `${prop}:${parseValue(prop, value, config)};`;
+        parseProp(key, theme).forEach(prop => {
+            result[0] = result[0] + `${prop}:${parseValue(prop, value, theme)};`;
         });
     });
     // result[0] contains the styles for the current selector, and should be wrapped into {}
@@ -188,7 +188,7 @@ const transformSelector = (selector, styles, config) => {
 };
 
 // Transform a styles object to string
-export const transform = (styles, config) => {
+export const transform = (styles, theme) => {
     const result = Object.entries(styles || {}).map(([key, value]) => {
         // Check for at rule
         if (key.startsWith("@")) {
@@ -199,19 +199,19 @@ export const transform = (styles, config) => {
             }
             // Check for @font-face rule
             else if (["@fontFace", "@fontface", "@font-face"].indexOf(key) > -1) {
-                return transformSelector("@font-face", value, config);
+                return transformSelector("@font-face", value, theme);
             }
             // if (/^@(media|keyframes)/.test(key.trim())) {
             else {
                 // Other rule (for example @media or @keyframes)
                 const rules = Object.keys(value).map(k => {
-                    return transformSelector(k, value[k], config);
+                    return transformSelector(k, value[k], theme);
                 });
                 return wrapRule(key, rules.join(" "));
             }
         }
         // Other value --> parse as regular classname
-        return transformSelector(key, value, config);
+        return transformSelector(key, value, theme);
     });
     return result.flat().join("\n");
 };
@@ -244,42 +244,41 @@ const createTarget = key => {
 };
 
 // Create a new instance of UniCSS
-export const createUni = config => {
+export const createUni = theme => {
     const cache = new Set();
-    config = config || {};
-    config.target = config.target || createTarget(config.key || "css");
+    const target = createTarget(theme?.key || "css");
 
     // Register css styles
     const createCss = s => {
-        const styles = transformSelector(".__uni__", s, config).join("\n"); 
+        const styles = transformSelector(".__uni__", s, theme).join("\n"); 
         const hash = hashCode(styles);
-        return registerStyles(hash, styles, cache, config.target);
+        return registerStyles(hash, styles, cache, target);
     };
 
     // Generate a keyframes styles
     const createKeyframes = s => {
         const styles = wrapRule(
             "@keyframes __uni__",
-            Object.keys(s).map(k => transformSelector(k, s[k], config)).join(" "),
+            Object.keys(s).map(k => transformSelector(k, s[k], theme)).join(" "),
         );
         const hash = hashCode(styles);
-        return registerStyles(hash, styles, cache, config.target);
+        return registerStyles(hash, styles, cache, target);
     };
 
     // Generate global styles
     const createGlobalCss = s => {
-        const styles = transform(s, config);
+        const styles = transform(s, theme);
         const hash = hashCode(styles);
-        return registerStyles(hash, styles, cache, config.target);
+        return registerStyles(hash, styles, cache, target);
     };
 
     return {
         css: createCss,
         globalCss: createGlobalCss,
         keyframes: createKeyframes,
-        extractCss: () => config.target?.innerHTML || "",
-        theme: config?.theme || {},
-        target: config?.target,
+        extractCss: () => target?.innerHTML || "",
+        theme: theme || {},
+        target,
     };
 };
 
