@@ -1,20 +1,19 @@
 import renderer from "react-test-renderer";
 import {
-    UniProvider,
+    ThemeProvider,
     useTheme,
     styled,
     Box,
-    useCss,
 } from "@unicss/react";
  
 const selector = `style[data-source="uni/react"]`;
 
-describe("UniProvider", () => {
+describe("ThemeProvider", () => {
     it("should render", () => {
         const component = renderer.create((
-            <UniProvider config={{}}>
+            <ThemeProvider theme={{}}>
                 <div>Hello world</div>
-            </UniProvider>
+            </ThemeProvider>
         ));
 
         expect(component.toJSON()).toMatchSnapshot();
@@ -24,9 +23,9 @@ describe("UniProvider", () => {
 describe("Box", () => {
     it("should render", () => {
         const component = renderer.create((
-            <UniProvider config={{}}>
+            <ThemeProvider theme={{}}>
                 <Box css={{color: "white"}}>Hello world</Box>
-            </UniProvider>
+            </ThemeProvider>
         ));
 
         expect(component.toJSON()).toMatchSnapshot();
@@ -46,9 +45,9 @@ describe("useTheme", () => {
             return null;
         };
         renderer.create((
-            <UniProvider config={{theme: defaultTheme}}>
+            <ThemeProvider theme={defaultTheme}>
                 <TestComponent />
-            </UniProvider>
+            </ThemeProvider>
         ));
 
         expect(theme).not.toBeNull();
@@ -62,9 +61,9 @@ describe("styled", () => {
             color: "white",
         });
         const component = renderer.create((
-            <UniProvider config={{}}>
+            <ThemeProvider theme={{}}>
                 <StyledComponent>Hello world</StyledComponent>
-            </UniProvider>
+            </ThemeProvider>
         ));
 
         expect(component.toJSON()).toMatchSnapshot();
@@ -72,9 +71,11 @@ describe("styled", () => {
 
     it("should apply theme", () => {
         const theme = {
-            colors: {
-                primary: "black",
-                secondary: "blue",
+            scales: {
+                colors: {
+                    primary: "black",
+                    secondary: "blue",
+                },
             },
         };
         const StyledComponent = styled("div", {
@@ -82,9 +83,9 @@ describe("styled", () => {
             color: "$primary",
         });
         const component = renderer.create((
-            <UniProvider config={{theme}}>
+            <ThemeProvider theme={theme}>
                 <StyledComponent>Hello</StyledComponent>
-            </UniProvider>
+            </ThemeProvider>
         ));
         const div = component.root.findByType("div");
 

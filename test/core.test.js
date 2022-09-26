@@ -7,13 +7,14 @@ import {
 describe("[core] create", () => {
     it("should create a new instance of uniCSS", () => {
         const theme = {
-            colors: {
-                white: "#fff",
+            scales: {
+                colors: {
+                    white: "#fff",
+                },
             },
+            aliases: {},
         };
-        const uni = createUni({
-            theme: theme,
-        });
+        const uni = createUni(theme);
 
         expect(uni.css).toBeDefined();
         expect(uni.globalCss).toBeDefined();
@@ -42,13 +43,10 @@ describe("[core] create", () => {
         expect(styles).toEqual(expect.stringContaining("{color:white;}"));
     });
 
-    it("(css) should allow to provide custom properties", () => {
+    it("(css) should allow to provide custom aliases", () => {
         const uni = createUni({
-            properties: {
-                size: value => ({
-                    height: value,
-                    width: value,
-                }),
+            aliases: {
+                size: ["height", "width"],
             },
         });
         const element = uni.css({
@@ -59,9 +57,9 @@ describe("[core] create", () => {
         expect(styles).toEqual(expect.stringContaining(`.${element} {height:1px;width:1px;}`));
     });
 
-    it("(css) should use theme values", () => {
+    it("(css) should use theme scales", () => {
         const uni = createUni({
-            theme: {
+            scales: {
                 colors: {
                     primary: "blue",
                     secondary: "red",

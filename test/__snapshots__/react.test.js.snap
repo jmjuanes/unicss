@@ -8,7 +8,7 @@ exports[`Box should render 1`] = `
 </div>
 `;
 
-exports[`UniProvider should render 1`] = `
+exports[`ThemeProvider should render 1`] = `
 <div>
   Hello world
 </div>
