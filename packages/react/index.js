@@ -17,12 +17,12 @@ export const useGlobalCss = styles => {
     return (React.useContext(Context)).globalCss(styles);
 };
 
-// UniCSS provider
-export const UniProvider = props => {
+// Theme provider
+export const ThemeProvider = props => {
     let ctx = React.useContext(Context);
-    if (!ctx || ctx?.theme !== props?.config?.theme) {
+    if (!ctx || ctx?.theme !== props?.theme) {
         ctx = createUni({
-            ...(props.config || {}),
+            ...(props.theme || {}),
             key: "react",
         });
     }
