@@ -70,12 +70,13 @@ describe("[core] create", () => {
             },
         });
         const element = uni.css({
+            borderColor: "$secondary",
             color: "$primary !important",
             width: "$none",
         });
         const styles = uni.extractCss();
 
-        expect(styles).toEqual(expect.stringContaining(`.${element} {color:blue !important;width:0px;}`));
+        expect(styles).toEqual(expect.stringContaining(`.${element} {border-color:red;color:blue !important;width:0px;}`));
     });
 
     it("(css) should apply mixins", () => {
