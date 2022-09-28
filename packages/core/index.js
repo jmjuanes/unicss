@@ -102,17 +102,18 @@ const wrapRule = (ruleName, ruleContent, separator) => {
 
 // Parse CSS property
 const parseProp = (prop, theme) => {
-    let propsToParse = [prop];
+    // let propsToParse = [prop];
     if (theme?.aliases?.[prop]) {
-        propsToParse = [theme.aliases[prop]].flat();
+        return [theme.aliases[prop]].flat();
     }
     // Parse props
-    return propsToParse.map(item => item.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`));
+    // return propsToParse.map(item => item.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`));
+    return [prop];
 };
 
 // Parse CSS value
 const parseValue = (prop, value, theme) => {
-    if (typeof value === "string" && value.indexOf("$") > -1 && defaultThemeMappings[prop]) {
+    if (typeof value === "string" && (value.indexOf("$") > -1) && defaultThemeMappings[prop]) {
         const scaleName = defaultThemeMappings[prop];
         const scale = theme?.scales?.[scaleName];
 
@@ -179,7 +180,8 @@ const transformSelector = (selector, styles, theme) => {
         }
         // Just parse as a simple property
         parseProp(key, theme).forEach(prop => {
-            result[0] = result[0] + `${prop}:${parseValue(prop, value, theme)};`;
+            const parsedProp = prop.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`);
+            result[0] = result[0] + `${parsedProp}:${parseValue(prop, value, theme)};`;
         });
     });
     // result[0] contains the styles for the current selector, and should be wrapped into {}
