@@ -1,6 +1,6 @@
 # @unicss/core
 
-A tiny and framework agnostic CSS-in-JS solution.
+A tiny, themeable, and framework agnostic CSS-in-JS solution.
 
 ## Installation
 
