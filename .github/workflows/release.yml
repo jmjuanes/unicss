@@ -1,0 +1,34 @@
+name: Release
+
+on:
+  release:
+    types: [created]
+
+jobs:
+  ## Generate list of monorepo packages to publish
+  packages:
+    runs-on: ubuntu-latest
+    outputs:
+      names: ${{ steps.folders.outputs.folders }}
+    steps:
+      - uses: actions/checkout@v3
+      - id: folders
+        run: echo "::set-output name=folders::$(ls -d packages/* | jq -R -s -c 'split("\n")[:-1]')"
+        # run: echo "::set-output name=folders::$(node ./scripts/packages.js)"
+
+  ## Publish monorepo packages
+  publish:
+    runs-on: ubuntu-latest
+    needs: [packages]
+    strategy:
+      matrix:
+        package: ${{ fromJson(needs.packages.outputs.names) }}
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '16.x'
+          registry-url: 'https://registry.npmjs.org'
+      - run: cd ${{ matrix.package }} && npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
