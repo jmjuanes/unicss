@@ -1,5 +1,8 @@
-import renderer from "react-test-renderer";
+import renderer, { create } from "react-test-renderer";
+import {createCache} from "@unicss/core";
 import {
+    CacheProvider,
+    useCache,
     ThemeProvider,
     useTheme,
     styled,
@@ -8,7 +11,7 @@ import {
  
 const selector = `style[data-source="uni/react"]`;
 
-describe("ThemeProvider", () => {
+describe("[react] ThemeProvider", () => {
     it("should render", () => {
         const component = renderer.create((
             <ThemeProvider theme={{}}>
@@ -20,7 +23,7 @@ describe("ThemeProvider", () => {
     });
 });
 
-describe("Box", () => {
+describe("[react] Box", () => {
     it("should render", () => {
         const component = renderer.create((
             <ThemeProvider theme={{}}>
@@ -32,7 +35,7 @@ describe("Box", () => {
     });
 });
 
-describe("useTheme", () => {
+describe("[react] useTheme", () => {
     it("should return current theme", () => {
         const defaultTheme = {
             colors: {
@@ -55,7 +58,7 @@ describe("useTheme", () => {
     });
 });
 
-describe("styled", () => {
+describe("[react] styled", () => {
     it("should return a valid React component", () => {
         const StyledComponent = styled("div", {
             color: "white",
@@ -92,5 +95,50 @@ describe("styled", () => {
         expect(div).toBeDefined();
         expect(div.props.className).toEqual(expect.stringContaining("uni-"));
         expect(document.querySelector(selector).innerHTML).toEqual(expect.stringContaining("color:black"));
+    });
+});
+
+describe("[react] CacheProvider", () => {
+    it("should render", () => {
+        const component = renderer.create((
+            <CacheProvider>
+                <div>Hello world</div>
+            </CacheProvider>
+        ));
+
+        expect(component.toJSON()).toMatchSnapshot();
+    });
+
+    it("should provide cache to ThemeProvider", () => {
+        const cache = createCache({key: "react-test"});
+        renderer.create((
+            <CacheProvider cache={cache}>
+                <ThemeProvider theme={{}}>
+                    <Box css={{backgroundColor: "mint"}} />
+                </ThemeProvider>
+            </CacheProvider>
+        ));
+
+        expect(document.querySelector("style[data-source='uni/react-test']")).toBeDefined();
+        // expect(cache.target.innerHTML).not.toBe("");
+        expect(cache.target.innerHTML).toEqual(expect.stringContaining(".uni-"));
+    });
+});
+
+describe("[react] useCache", () => {
+    it("should return provided cache", () => {
+        const cache = createCache();
+        let providedCache = null;
+        const InternalComponent = () => {
+            providedCache = useCache();
+            return null;
+        };
+        const component = renderer.create((
+            <CacheProvider cache={cache}>
+                <InternalComponent />
+            </CacheProvider>
+        ));
+
+        expect(providedCache).toEqual(cache);
     });
 });
