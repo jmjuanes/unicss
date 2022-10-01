@@ -126,6 +126,24 @@ describe("[core] create", () => {
         );
     });
 
+    it("(css) should allow to override global variables", () => {
+        const uni = createUni({
+            globals: {
+                size: "var(--size-lg)",
+            },
+        });
+        const element = uni.css({
+            "$$size": "var(--size-sm)",
+            fontSize: "$$size",
+        });
+        const styles = uni.extractCss();
+
+        expect(element).not.toBe("");
+        expect(styles).toEqual(
+            expect.stringContaining("{font-size:var(--size-sm);}"),
+        );
+    });
+
     it("(keyframes) should parse and generate keyframes", () => {
         const uni = createUni({});
         const name = uni.keyframes({
