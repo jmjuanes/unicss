@@ -70,13 +70,13 @@ describe("[core] create", () => {
             },
         });
         const element = uni.css({
-            borderColor: "$secondary",
-            color: "$primary !important",
-            width: "$none",
+            borderColor: "secondary",
+            color: "primary !important",
+            width: "none",
         });
         const styles = uni.extractCss();
 
-        expect(styles).toEqual(expect.stringContaining(`.${element} {border-color:red;color:blue !important;width:0px;}`));
+        expect(styles).toEqual(expect.stringContaining(`.${element} {border-color:red;color:blue!important;width:0px;}`));
     });
 
     it("(css) should apply mixins", () => {
@@ -110,19 +110,35 @@ describe("[core] create", () => {
             },
             scales: {
                 colors: {
-                    primary: "$$primaryColor",
+                    primary: "$primaryColor",
                 },
             },
         });
         const element = uni.css({
-            backgroundColor: "$$secondaryColor",
-            color: "$primary",
+            backgroundColor: "$secondaryColor",
+            color: "primary",
         });
         const styles = uni.extractCss();
 
         expect(element).not.toBe("");
         expect(styles).toEqual(
             expect.stringContaining("{background-color:orange;color:purple;}"),
+        );
+    });
+
+    it("(css) should allow to apply local variables", () => {
+        const uni = createUni({});
+        const element = uni.css({
+            "$background": "navy",
+            "$color": "salmon",
+            backgroundColor: "$background",
+            color: "$color",
+        });
+        const styles = uni.extractCss();
+
+        expect(element).not.toBe("");
+        expect(styles).toEqual(
+            expect.stringContaining("{background-color:navy;color:salmon;}"),
         );
     });
 
@@ -133,8 +149,8 @@ describe("[core] create", () => {
             },
         });
         const element = uni.css({
-            "$$size": "var(--size-sm)",
-            fontSize: "$$size",
+            "$size": "var(--size-sm)",
+            fontSize: "$size",
         });
         const styles = uni.extractCss();
 

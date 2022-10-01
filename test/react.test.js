@@ -79,8 +79,8 @@ describe("styled", () => {
             },
         };
         const StyledComponent = styled("div", {
-            backgroundColor: "$secondary",
-            color: "$primary",
+            backgroundColor: "secondary",
+            color: "primary",
         });
         const component = renderer.create((
             <ThemeProvider theme={theme}>
