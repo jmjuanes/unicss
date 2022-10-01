@@ -256,15 +256,22 @@ export const createCache = options => {
             document.head.appendChild(target);
         }
     }
-    // TODO: initialize cache with the initial values in target
+    // Initialize cache with the initial values in target
+    if (target.innerHTML) {
+        const regex = /::(uni\-[\w]+)::/gm;
+        [...target.innerHTML.matchAll(regex)].forEach(match => {
+            inserted.add(match[1]);
+        });
+    }
     // Generate new cache and return it
     const cache = {
         key,
         insert: (styles, sep = "\n") => {
             const hash = hashCode(styles);
             if (!inserted.has(hash)) {
+                const header = `/* ::{hash}:: */`;
                 const body = styles.replaceAll("__uni__", hash);
-                target.innerHTML = target.innerHTML + body + sep;
+                target.innerHTML = target.innerHTML + header + sep + body + sep;
                 inserted.add(hash);
             }
             return hash;
