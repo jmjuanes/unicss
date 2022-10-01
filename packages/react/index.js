@@ -1,32 +1,50 @@
 import React from "react";
-import {createUni, classNames} from "@unicss/core";
+import {
+    createUni,
+    createCache,
+    classNames,
+} from "@unicss/core";
 
-const Context = React.createContext(null);
+const ThemeContext = React.createContext(null);
+const CacheContext = React.createContext(null);
 
 // Available hooks
 export const useTheme = () => {
-    return (React.useContext(Context)).theme;
+    return (React.useContext(ThemeContext)).theme;
 };
 export const useCss = styles => {
-    return (React.useContext(Context)).css(styles);
+    return (React.useContext(ThemeContext)).css(styles);
 };
 export const useKeyframes = obj => {
-    return (React.useContext(Context)).keyframes(obj);
+    return (React.useContext(ThemeContext)).keyframes(obj);
 };
 export const useGlobalCss = styles => {
-    return (React.useContext(Context)).globalCss(styles);
+    return (React.useContext(ThemeContext)).globalCss(styles);
+};
+export const useCache = () => {
+    return React.useContext(CacheContext);
+};
+
+// Cache provider
+export const CacheProvider = props => {
+    let cache = React.useContext(CacheContext);
+    if (!cache) {
+        cache = props.cache || createCache({key: "react"});
+    }
+    return React.createElement(CacheContext.Provider, {value: cache}, props.children);
 };
 
 // Theme provider
 export const ThemeProvider = props => {
-    let ctx = React.useContext(Context);
+    let ctx = React.useContext(ThemeContext);
+    const cache = React.useContext(CacheContext);
     if (!ctx || ctx?.theme !== props?.theme) {
-        ctx = createUni({
-            ...(props.theme || {}),
-            key: "react",
-        });
+        ctx = createUni(
+            props.theme || {},
+            cache || createCache({key: "react"}),
+        );
     }
-    return React.createElement(Context.Provider, {value: ctx}, props.children);
+    return React.createElement(ThemeContext.Provider, {value: ctx}, props.children);
 };
 
 // HOC that wraps a component and adds the current theme as a prop
