@@ -113,16 +113,23 @@ const parseProp = (prop, theme) => {
 
 // Parse CSS value
 const parseValue = (prop, value, theme) => {
-    if (typeof value === "string" && (value.indexOf("$") > -1) && defaultThemeMappings[prop]) {
+    if (typeof value === "string" && defaultThemeMappings[prop] && (value.indexOf("$") > -1)) {
         const scaleName = defaultThemeMappings[prop];
         const scale = theme?.scales?.[scaleName];
 
         if (scale && typeof scale === "object") {
-            return value.replace(/\$([^\s]+)/g, (match, key) => {
+            value = value.replace(/(?:^|[^\$])\$(\w+)/g, (match, key) => {
                 return typeof scale[key] !== "undefined" ? scale[key].toString() : match;
             });
         }
     }
+    // Check for global variable
+    if (typeof value === "string" && theme?.globals && (value.indexOf("$$") > -1)) {
+        value = value.replace(/\$\$(\w+)/g, (match, key) => {
+            return typeof theme?.globals?.[key] !== "undefined" ? theme.globals[key].toString() : match;
+        });
+    }
+    // Return parsed value
     return value;
 };
 
