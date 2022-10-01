@@ -1,6 +1,6 @@
 {
     "name": "@unicss/react",
-    "version": "0.0.1",
+    "version": "0.0.2",
     "description": "React integration for UniCSS",
     "author": "Josemi Juanes <hello@josemi.xyz>",
     "type": "module",
@@ -14,7 +14,7 @@
         "react"
     ],
     "dependencies": {
-        "@unicss/core": "^0.0.1"
+        "@unicss/core": "^0.0.2"
     },
     "peerDependencies": {
         "react": ">= 17"
