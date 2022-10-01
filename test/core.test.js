@@ -102,6 +102,30 @@ describe("[core] create", () => {
         expect(styles).toEqual(expect.stringContaining("{margin:2px;applied1:test1;applied2:test2;}"));
     });
 
+    it("(css) should apply global variables", () => {
+        const uni = createUni({
+            globals: {
+                primaryColor: "purple",
+                secondaryColor: "orange",
+            },
+            scales: {
+                colors: {
+                    primary: "$$primaryColor",
+                },
+            },
+        });
+        const element = uni.css({
+            backgroundColor: "$$secondaryColor",
+            color: "$primary",
+        });
+        const styles = uni.extractCss();
+
+        expect(element).not.toBe("");
+        expect(styles).toEqual(
+            expect.stringContaining("{background-color:orange;color:purple;}"),
+        );
+    });
+
     it("(keyframes) should parse and generate keyframes", () => {
         const uni = createUni({});
         const name = uni.keyframes({
