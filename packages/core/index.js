@@ -112,7 +112,7 @@ const parseProp = (prop, theme) => {
 };
 
 // Parse CSS value
-const parseValue = (prop, value, theme) => {
+const parseValue = (prop, value, theme, vars) => {
     if (typeof value === "string" && defaultThemeMappings[prop] && (value.indexOf("$") > -1)) {
         const scaleName = defaultThemeMappings[prop];
         const scale = theme?.scales?.[scaleName];
@@ -123,10 +123,10 @@ const parseValue = (prop, value, theme) => {
             });
         }
     }
-    // Check for global variable
-    if (typeof value === "string" && theme?.globals && (value.indexOf("$$") > -1)) {
+    // Check for variable
+    if (typeof value === "string" && (value.indexOf("$$") > -1)) {
         value = value.replace(/\$\$(\w+)/g, (match, key) => {
-            return typeof theme?.globals?.[key] !== "undefined" ? theme.globals[key].toString() : match;
+            return typeof vars?.[key] !== "undefined" ? vars[key].toString() : match;
         });
     }
     // Return parsed value
@@ -160,37 +160,47 @@ const parseMixins = (styles, theme, prev) => {
 };
 
 // Transform a selector rule
-const transformSelector = (selector, styles, theme) => {
+const transformSelector = (selector, styles, theme, globals) => {
     if (styles && Array.isArray(styles)) {
-        return styles.map(s => transformSelector(selector, s, theme)).flat();
+        return styles.map(s => transformSelector(selector, s, theme, globals)).flat();
     }
     const result = [""];
-    Object.entries(parseMixins(styles, theme)).forEach(([key, value]) => {
-        // skip content in the 'variants' key: reserved only to register variants
-        // Skip content in the 'apply' key: reserved only to mixins
-        if (key === "variants" || key === "apply" || value === null) {
-            return;
-        }
-        // Nested styles or @media rules 
-        if (typeof value === "object") {
-            // Media rules styles should be wrapped into a new rule
-            if (/^@/.test(key)) {
+    const vars = {...globals};
+    const parsedStyles = parseMixins(styles, theme);
+    Object.keys(parsedStyles)
+        .filter(key => {
+            // Check to override a global variable or set a new variable
+            if (key.startsWith("$$")) {
+                vars[key.replace("$$", "")] = parsedStyles[key];
+                return false; // skip this
+            }
+            // Skip content in the 'variants' key: reserved only to register variants
+            // Skip content in the 'apply' key: reserved only to mixins
+            // Skip null values
+            return key !== "variants" && key !== "apply" && parsedStyles[key] !== null;
+        })
+        .forEach(key => {
+            const value = parsedStyles[key];
+            // Nested styles or @media rules 
+            if (typeof value === "object") {
+                // Media rules styles should be wrapped into a new rule
+                if (/^@/.test(key)) {
+                    return result.push(
+                        wrapRule(key, transformSelector(selector, value, theme, vars), "\n"),
+                    );
+                }
+                // Add nested styles
+                // We should replace the & with the current selector
                 return result.push(
-                    wrapRule(key, transformSelector(selector, value, theme), "\n"),
+                    transformSelector(key.replaceAll("&", selector), value, theme, vars),
                 );
             }
-            // Add nested styles
-            // We should replace the & with the current selector
-            return result.push(
-                transformSelector(key.replaceAll("&", selector), value, theme),
-            );
-        }
-        // Just parse as a simple property
-        parseProp(key, theme).forEach(prop => {
-            const parsedProp = prop.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`);
-            result[0] = result[0] + `${parsedProp}:${parseValue(prop, value, theme)};`;
+            // Just parse as a simple property
+            parseProp(key, theme).forEach(prop => {
+                const p = prop.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`);
+                result[0] = result[0] + `${p}:${parseValue(prop, value, theme, vars)};`;
+            });
         });
-    });
     // result[0] contains the styles for the current selector, and should be wrapped into {}
     result[0] = wrapRule(selector, result[0], "");
     return result.flat(2);
@@ -198,6 +208,9 @@ const transformSelector = (selector, styles, theme) => {
 
 // Transform a styles object to string
 export const transform = (styles, theme) => {
+    const globals = {
+        ...(theme?.globals || {}),
+    };
     const result = Object.entries(styles || {}).map(([key, value]) => {
         // Check for at rule
         if (key.startsWith("@")) {
@@ -208,19 +221,19 @@ export const transform = (styles, theme) => {
             }
             // Check for @font-face rule
             else if (["@fontFace", "@fontface", "@font-face"].indexOf(key) > -1) {
-                return transformSelector("@font-face", value, theme);
+                return transformSelector("@font-face", value, theme, globals);
             }
             // if (/^@(media|keyframes)/.test(key.trim())) {
             else {
                 // Other rule (for example @media or @keyframes)
                 const rules = Object.keys(value).map(k => {
-                    return transformSelector(k, value[k], theme);
+                    return transformSelector(k, value[k], theme, globals);
                 });
                 return wrapRule(key, rules.join(" "));
             }
         }
         // Other value --> parse as regular classname
-        return transformSelector(key, value, theme);
+        return transformSelector(key, value, theme, globals);
     });
     return result.flat().join("\n");
 };
@@ -259,17 +272,14 @@ export const createUni = theme => {
 
     // Register css styles
     const createCss = s => {
-        const styles = transformSelector(".__uni__", s, theme).join("\n"); 
+        const styles = transform({".__uni__": s}, theme);
         const hash = hashCode(styles);
         return registerStyles(hash, styles, cache, target);
     };
 
     // Generate a keyframes styles
     const createKeyframes = s => {
-        const styles = wrapRule(
-            "@keyframes __uni__",
-            Object.keys(s).map(k => transformSelector(k, s[k], theme)).join(" "),
-        );
+        const styles = transform({"@keyframes __uni__": s}, theme);
         const hash = hashCode(styles);
         return registerStyles(hash, styles, cache, target);
     };
