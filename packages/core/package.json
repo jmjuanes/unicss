@@ -1,6 +1,6 @@
 {
     "name": "@unicss/core",
-    "version": "0.0.0",
+    "version": "0.0.1",
     "description": "The framework-agnostic CSS-in-JS implementation",
     "author": "Josemi Juanes <hello@josemi.xyz>",
     "type": "module",
