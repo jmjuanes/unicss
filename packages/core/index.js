@@ -239,66 +239,59 @@ export const transform = (styles, theme) => {
     return result.flat().join("\n");
 };
 
-const registerStyles = (hash, css, cache, target) => {
-    if (!cache.has(hash)) {
-        target.innerHTML = target.innerHTML + css.replaceAll("__uni__", hash) + "\n";
-        cache.add(hash);
-    }
-    return hash;
-};
-
-const createTarget = key => {
-    // Check if we are in a DOM env
+export const createCache = options => {
+    const key = options?.key || "css";
+    const inserted = new Set(); 
+    let target = {
+        innerHTML: "",
+    };
+    // Check if we are in a DOM env: get target from existing <style> tag
+    // Or create a new target tag
     if (typeof document !== "undefined") {
-        let target = document.querySelector(`[data-source="uni/${key}"`);
+        target = document.querySelector(`[data-source="uni/${key}"`);
         if (!target) {
             target = document.createElement("style");
             target.dataset.source = `uni/${key}`;
             target.innerHTML = "";
             document.head.appendChild(target);
         }
-        return target;
     }
-    // Other case: we are not in an env supporting DOM (maybe SSR)
-    // return a fake <style> tag
-    return {
-        innerHTML: "",
+    // TODO: initialize cache with the initial values in target
+    // Generate new cache and return it
+    const cache = {
+        key,
+        insert: (styles, sep = "\n") => {
+            const hash = hashCode(styles);
+            if (!inserted.has(hash)) {
+                const body = styles.replaceAll("__uni__", hash);
+                target.innerHTML = target.innerHTML + body + sep;
+                inserted.add(hash);
+            }
+            return hash;
+        },
+        clear: () => {
+            target.innerHTML = "";
+            inserted.clear();
+        },
+        inserted,
+        target,
     };
+    return cache;
 };
 
 // Create a new instance of UniCSS
-export const createUni = theme => {
-    const cache = new Set();
-    const target = createTarget(theme?.key || "css");
-
-    // Register css styles
-    const createCss = s => {
-        const styles = transform({".__uni__": s}, theme);
-        const hash = hashCode(styles);
-        return registerStyles(hash, styles, cache, target);
-    };
-
-    // Generate a keyframes styles
-    const createKeyframes = s => {
-        const styles = transform({"@keyframes __uni__": s}, theme);
-        const hash = hashCode(styles);
-        return registerStyles(hash, styles, cache, target);
-    };
-
-    // Generate global styles
-    const createGlobalCss = s => {
-        const styles = transform(s, theme);
-        const hash = hashCode(styles);
-        return registerStyles(hash, styles, cache, target);
-    };
+export const createUni = (theme, initialCache = null) => {
+    const cache = initialCache || createCache({
+        key: theme?.key || "css",
+    });
 
     return {
-        css: createCss,
-        globalCss: createGlobalCss,
-        keyframes: createKeyframes,
-        extractCss: () => target?.innerHTML || "",
+        css: s => cache.insert(transform({".__uni__": s}, theme)),
+        globalCss: s => cache.insert(transform(s, theme)),
+        keyframes: s => cache.insert(transform({"@keyframes __uni__": s}, theme)),
+        extractCss: () => cache.target?.innerHTML || "",
         theme: theme || {},
-        target,
+        cache,
     };
 };
 
