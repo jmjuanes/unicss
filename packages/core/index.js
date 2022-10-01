@@ -113,24 +113,25 @@ const parseProp = (prop, theme) => {
 
 // Parse CSS value
 const parseValue = (prop, value, theme, vars) => {
-    if (typeof value === "string" && defaultThemeMappings[prop] && (value.indexOf("$") > -1)) {
-        const scaleName = defaultThemeMappings[prop];
-        const scale = theme?.scales?.[scaleName];
-
-        if (scale && typeof scale === "object") {
-            value = value.replace(/(?:^|[^\$])\$(\w+)/g, (match, key) => {
-                return typeof scale[key] !== "undefined" ? scale[key].toString() : match;
+    let isImportant = false;
+    if (typeof value === "string") {
+        if (defaultThemeMappings[prop] && value.indexOf("$") === -1) {
+            const scaleName = defaultThemeMappings[prop];
+            const scale = theme?.scales?.[scaleName];
+            value = value.replace(/\s*!important/, () => {
+                isImportant = true;
+                return "";
             });
+            if (scale && typeof scale === "object" && typeof scale[value] !== "undefined") {
+                value = scale[value].toString();
+            }
         }
-    }
-    // Check for variable
-    if (typeof value === "string" && (value.indexOf("$$") > -1)) {
-        value = value.replace(/\$\$(\w+)/g, (match, key) => {
-            return typeof vars?.[key] !== "undefined" ? vars[key].toString() : match;
+        // Replace all variables
+        value = value.replace(/\$(\w+)/g, (match, key) => {
+            return typeof vars?.[key] !== "undefined" ? vars[key] : match;
         });
     }
-    // Return parsed value
-    return value;
+    return isImportant ? value + "!important" : value;
 };
 
 // Parse mixins
@@ -170,8 +171,8 @@ const transformSelector = (selector, styles, theme, globals) => {
     Object.keys(parsedStyles)
         .filter(key => {
             // Check to override a global variable or set a new variable
-            if (key.startsWith("$$")) {
-                vars[key.replace("$$", "")] = parsedStyles[key];
+            if (key.startsWith("$")) {
+                vars[key.replace("$", "")] = parsedStyles[key];
                 return false; // skip this
             }
             // Skip content in the 'variants' key: reserved only to register variants
