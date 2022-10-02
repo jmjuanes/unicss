@@ -269,7 +269,7 @@ export const createCache = options => {
         insert: (styles, sep = "\n") => {
             const hash = hashCode(styles);
             if (!inserted.has(hash)) {
-                const header = `/* ::{hash}:: */`;
+                const header = `/* ::${hash}:: */`;
                 const body = styles.replaceAll("__uni__", hash);
                 target.innerHTML = target.innerHTML + header + sep + body + sep;
                 inserted.add(hash);
