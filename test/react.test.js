@@ -38,8 +38,10 @@ describe("[react] Box", () => {
 describe("[react] useTheme", () => {
     it("should return current theme", () => {
         const defaultTheme = {
-            colors: {
-                primary: "black",
+            tokens: {
+                colors: {
+                    primary: "black",
+                },
             },
         };
         let theme = null;
@@ -54,7 +56,7 @@ describe("[react] useTheme", () => {
         ));
 
         expect(theme).not.toBeNull();
-        expect(theme?.colors?.primary).toBe(defaultTheme.colors.primary);
+        expect(theme?.tokens?.colors?.primary).toBe(defaultTheme.tokens.colors.primary);
     });
 });
 
@@ -74,7 +76,7 @@ describe("[react] styled", () => {
 
     it("should apply theme", () => {
         const theme = {
-            scales: {
+            tokens: {
                 colors: {
                     primary: "black",
                     secondary: "blue",
@@ -82,8 +84,8 @@ describe("[react] styled", () => {
             },
         };
         const StyledComponent = styled("div", {
-            backgroundColor: "secondary",
-            color: "primary",
+            backgroundColor: "$secondary",
+            color: "$primary",
         });
         const component = renderer.create((
             <ThemeProvider theme={theme}>

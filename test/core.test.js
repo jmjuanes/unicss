@@ -4,10 +4,10 @@ import {
     classNames,
 } from "@unicss/core";
 
-describe("[core] create", () => {
+describe("[core] createUni", () => {
     it("should create a new instance of uniCSS", () => {
         const theme = {
-            scales: {
+            tokens: {
                 colors: {
                     white: "#fff",
                 },
@@ -57,9 +57,9 @@ describe("[core] create", () => {
         expect(styles).toEqual(expect.stringContaining(`.${element} {height:1px;width:1px;}`));
     });
 
-    it("(css) should use theme scales", () => {
+    it("(css) should use theme tokens", () => {
         const uni = createUni({
-            scales: {
+            tokens: {
                 colors: {
                     primary: "blue",
                     secondary: "red",
@@ -70,59 +70,31 @@ describe("[core] create", () => {
             },
         });
         const element = uni.css({
-            borderColor: "secondary",
-            color: "primary !important",
-            width: "none",
+            borderColor: "$secondary",
+            color: "$primary!important",
+            width: "$none",
         });
         const styles = uni.extractCss();
 
         expect(styles).toEqual(expect.stringContaining(`.${element} {border-color:red;color:blue!important;width:0px;}`));
     });
 
-    it("(css) should apply mixins", () => {
+    it("(css) should use theme tokens from path", () => {
         const uni = createUni({
-            mixins: {
-                test1: {
-                    applied1: "test1",
-                    margin: "1px",
-                },
-                test2: {
-                    applied2: "test2",
-                    margin: "2px",
-                },
-            },
-        });
-        const element = uni.css({
-            apply: ["test1", "test2"],
-            margin: "0px",
-        });
-        const styles = uni.extractCss();
-
-        expect(element).not.toBe("");
-        expect(styles).toEqual(expect.stringContaining("{margin:2px;applied1:test1;applied2:test2;}"));
-    });
-
-    it("(css) should apply global variables", () => {
-        const uni = createUni({
-            globals: {
-                primaryColor: "purple",
-                secondaryColor: "orange",
-            },
-            scales: {
+            tokens: {
                 colors: {
-                    primary: "$primaryColor",
+                    primary: "orange",
                 },
             },
         });
         const element = uni.css({
-            backgroundColor: "$secondaryColor",
-            color: "primary",
+            border: "2px solid $colors.primary",
         });
         const styles = uni.extractCss();
 
         expect(element).not.toBe("");
         expect(styles).toEqual(
-            expect.stringContaining("{background-color:orange;color:purple;}"),
+            expect.stringContaining("{border:2px solid orange;}"),
         );
     });
 
@@ -142,21 +114,23 @@ describe("[core] create", () => {
         );
     });
 
-    it("(css) should allow to override global variables", () => {
+    it("(css) should use first local variables instead of tokens", () => {
         const uni = createUni({
-            globals: {
-                size: "var(--size-lg)",
+            tokens: {
+                fontSizes: {
+                    base: "14px",
+                },
             },
         });
         const element = uni.css({
-            "$size": "var(--size-sm)",
-            fontSize: "$size",
+            "$base": "16px",
+            fontSize: "$base!important",
         });
         const styles = uni.extractCss();
 
         expect(element).not.toBe("");
         expect(styles).toEqual(
-            expect.stringContaining("{font-size:var(--size-sm);}"),
+            expect.stringContaining("{font-size:16px!important;}"),
         );
     });
 
