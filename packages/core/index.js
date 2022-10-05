@@ -47,13 +47,23 @@ export const defaultThemeMappings = {
     width: "sizes",
 };
 
-// Default theme aliases
-export const defaultThemeAliases = {
-    h: "height",
-    p: "padding",
-    m: "margin",
-    size: ["height", "width"],
-    w: "width",
+// Unitless CSS properties
+const unitlessProperties = {
+    animationIterationCount: true,
+    flex: true,
+    flexGrow: true,
+    flexOrder: true,
+    flexShrink: true,
+    fontWeight: true,
+    gridRow: true,
+    gridColumn: true,
+    lineClamp: true,
+    lineHeight: true,
+    opacity: true,
+    order: true,
+    widows: true,
+    zIndex: true,
+    zoom: true,
 };
 
 const hashCode = str => {
@@ -113,87 +123,71 @@ const parseProp = (prop, theme) => {
 
 // Parse CSS value
 const parseValue = (prop, value, theme, vars) => {
-    let isImportant = false;
     if (typeof value === "string") {
-        if (defaultThemeMappings[prop] && value.indexOf("$") === -1) {
-            const scaleName = defaultThemeMappings[prop];
-            const scale = theme?.scales?.[scaleName];
-            value = value.replace(/\s*!important/, () => {
-                isImportant = true;
-                return "";
-            });
-            if (scale && typeof scale === "object" && typeof scale[value] !== "undefined") {
-                value = scale[value].toString();
+        return value.replace(/\$([\w\.]+)/g, (match, key) => {
+            // Check for a local variable
+            if (typeof vars[key] !== "undefined") {
+                return vars[key];
             }
-        }
-        // Replace all variables
-        value = value.replace(/\$(\w+)/g, (match, key) => {
-            return typeof vars?.[key] !== "undefined" ? vars[key] : match;
-        });
-    }
-    return isImportant ? value + "!important" : value;
-};
-
-// Parse mixins
-const parseMixins = (styles, theme, prev) => {
-    prev = prev || new Set();
-    if (theme?.mixins && styles?.apply && (typeof styles.apply === "string" || Array.isArray(styles.apply))) {
-        const mixinsList = [styles.apply].flat().filter(n => {
-            return n && typeof n === "string";
-        });
-        return {
-            ...exclude(styles, "apply"),
-            ...toObject(mixinsList, (newStyles, mixinName) => {
-                if (prev.has(mixinName)) {
-                    return newStyles;
+            // Check for applying a token property (without naming)
+            if (defaultThemeMappings[prop] && key.indexOf(".") === -1) {
+                const tokenName = defaultThemeMappings[prop];
+                const token = theme?.tokens?.[tokenName];
+                if (token && typeof token === "object" && typeof token[key] !== "undefined") {
+                    return token[key];
                 }
-                // Apply styles from this mixin
-                prev.add(mixinName);
-                return {
-                    ...newStyles,
-                    ...parseMixins(get(theme?.mixins || {}, mixinName), theme, prev),
-                };
-            }),
-        };
+            }
+            // Check for getting a different token
+            if (key.indexOf(".") > -1) {
+                const newValue = get(theme?.tokens || {}, key);
+                if (typeof newValue !== "undefined") {
+                    return newValue;
+                }
+            }
+            // Other case: return the match without replacing
+            // TODO: display a warning or error message
+            return match;
+        });
     }
-    // No mixins to apply
-    return styles || {};
+    // Check for number and not unitless property
+    // Automatically append 'px' to the value
+    if (typeof value === "number" && !unitlessProperties[prop]) {
+        return value.toString() + "px";
+    }
+    return value;
 };
 
 // Transform a selector rule
-const transformSelector = (selector, styles, theme, globals) => {
+const transformSelector = (selector, styles, theme, vars) => {
     if (styles && Array.isArray(styles)) {
-        return styles.map(s => transformSelector(selector, s, theme, globals)).flat();
+        return styles.map(s => transformSelector(selector, s, theme, {...vars})).flat();
     }
     const result = [""];
-    const vars = {...globals};
-    const parsedStyles = parseMixins(styles, theme);
-    Object.keys(parsedStyles)
+    // const parsedStyles = parseMixins(styles, theme);
+    Object.keys(styles)
         .filter(key => {
-            // Check to override a global variable or set a new variable
             if (key.startsWith("$")) {
-                vars[key.replace("$", "")] = parsedStyles[key];
+                vars[key.replace("$", "")] = styles[key];
                 return false; // skip this
             }
             // Skip content in the 'variants' key: reserved only to register variants
-            // Skip content in the 'apply' key: reserved only to mixins
             // Skip null values
-            return key !== "variants" && key !== "apply" && parsedStyles[key] !== null;
+            return key !== "variants" && styles[key] !== null;
         })
         .forEach(key => {
-            const value = parsedStyles[key];
+            const value = styles[key];
             // Nested styles or @media rules 
             if (typeof value === "object") {
                 // Media rules styles should be wrapped into a new rule
-                if (/^@/.test(key)) {
+                if (key.startsWith("@")) {
                     return result.push(
-                        wrapRule(key, transformSelector(selector, value, theme, vars), "\n"),
+                        wrapRule(key, transformSelector(selector, value, theme, {...vars}), "\n"),
                     );
                 }
                 // Add nested styles
                 // We should replace the & with the current selector
                 return result.push(
-                    transformSelector(key.replaceAll("&", selector), value, theme, vars),
+                    transformSelector(key.replaceAll("&", selector), value, theme, {...vars}),
                 );
             }
             // Just parse as a simple property
@@ -209,11 +203,7 @@ const transformSelector = (selector, styles, theme, globals) => {
 
 // Transform a styles object to string
 export const transform = (styles, theme) => {
-    const globals = {
-        ...(theme?.globals || {}),
-    };
     const result = Object.entries(styles || {}).map(([key, value]) => {
-        // Check for at rule
         if (key.startsWith("@")) {
             // Check for @import rule, just add one @import for each source
             // value must be a string or an array of strings
@@ -222,19 +212,16 @@ export const transform = (styles, theme) => {
             }
             // Check for @font-face rule
             else if (["@fontFace", "@fontface", "@font-face"].indexOf(key) > -1) {
-                return transformSelector("@font-face", value, theme, globals);
+                return transformSelector("@font-face", value, theme, {});
             }
-            // if (/^@(media|keyframes)/.test(key.trim())) {
-            else {
-                // Other rule (for example @media or @keyframes)
-                const rules = Object.keys(value).map(k => {
-                    return transformSelector(k, value[k], theme, globals);
-                });
-                return wrapRule(key, rules.join(" "));
-            }
+            // Other rule (for example @media or @keyframes)
+            const rules = Object.keys(value).map(k => {
+                return transformSelector(k, value[k], theme, {});
+            });
+            return wrapRule(key, rules.join(" "));
         }
         // Other value --> parse as regular classname
-        return transformSelector(key, value, theme, globals);
+        return transformSelector(key, value, theme, {});
     });
     return result.flat().join("\n");
 };
