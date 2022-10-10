@@ -1,7 +1,7 @@
 {
     "name": "unicss",
     "version": "0.0.2",
-    "description": "The framework-agnostic CSS-in-JS implementation",
+    "description": "The universal CSS-In-JS microlibrary",
     "author": "Josemi Juanes <hello@josemi.xyz>",
     "type": "module",
     "license": "MIT",
