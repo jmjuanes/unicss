@@ -1,4 +1,4 @@
-import {classNames, merge} from "../packages/unicss/index.js";
+import {classNames, merge} from "../index.js";
 
 describe("classNames", () => {
     it("should join arguments into a single string", () => {

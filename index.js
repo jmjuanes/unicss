@@ -21,11 +21,6 @@ export const hashify = (str, prefix = "uni-") => {
     return prefix + Math.abs(Array.from(str).reduce((s, c) => Math.imul(31, s) + c.charCodeAt(0) | 0, 0)).toString();
 };
 
-// Get value in object from path
-export const get = (obj, path) => {
-    return path.split(".").reduce((o, p) => o?.[p], obj);
-};
-
 // Merge CSS styles
 export const merge = (source, target) => {
     source = {...source};
@@ -64,49 +59,21 @@ export const classNames = (...args) => {
     }).flat().join(" ");
 };
 
-// Wrap CSS Rule
 const wrapRule = (ruleName, ruleContent, separator) => {
     return `${ruleName} {${separator || ""}${ruleContent}${separator || ""}}`;
 };
 
-// Parse CSS property
-const parseProp = (prop, theme) => {
-    // let propsToParse = [prop];
-    if (theme?.aliases?.[prop]) {
-        return [theme.aliases[prop]].flat();
+const parseProp = (prop, ctx) => {
+    if (ctx?.aliases?.[prop]) {
+        return [ctx.aliases[prop]].flat();
     }
-    // Parse props
-    // return propsToParse.map(item => item.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`));
     return [prop];
 };
 
-// Parse CSS value
-const parseValue = (prop, value, theme, vars) => {
-    if (typeof value === "string") {
-        return value.replace(/\$([\w\.]+)/g, (match, key) => {
-            // Check for a local variable
-            if (typeof vars[key] !== "undefined") {
-                return vars[key];
-            }
-            // Check for applying a token property (without naming)
-            if (theme?.mapping?.[prop] && key.indexOf(".") === -1) {
-                const tokenName = theme.mapping[prop];
-                const token = theme?.[tokenName];
-                if (token && typeof token === "object" && typeof token[key] !== "undefined") {
-                    return token[key];
-                }
-            }
-            // Check for getting a different token
-            if (key.indexOf(".") > -1) {
-                const newValue = get(theme || {}, key);
-                if (typeof newValue !== "undefined") {
-                    return newValue;
-                }
-            }
-            // Other case: return the match without replacing
-            // TODO: display a warning or error message
-            return match;
-        });
+const parseValue = (prop, value, ctx) => {
+    // Check for function value --> call it with the current theme
+    if (typeof value === "function") {
+        value = value(ctx.theme || {});
     }
     // Check for number and not unitless property
     // Automatically append 'px' to the value
@@ -116,43 +83,18 @@ const parseValue = (prop, value, theme, vars) => {
     return value;
 };
 
-// Parse styles
-const parseStyles = (initialStyles, theme) => {
-    const media = theme?.media || {};
-    return Object.keys(initialStyles).reduce((styles, key) => {
-        if (key.startsWith("@")) {
-            if (typeof initialStyles[key] === "object") {
-                const rule = !!media[key.slice(1)] ? `@media ${media[key.slice(1)]}` : key;
-                styles[rule] = merge(styles[rule] || {}, initialStyles[key] || {});
-            }
-            else if (key.indexOf(":") > -1){
-                const [name, prop] = key.slice(1).split(":");
-                if (media[name]) {
-                    const rule = `@media ${media[name]}`;
-                    styles[rule] = merge(styles[rule] || {}, { [prop]: initialStyles[key] });
-                }
-            }
-        }
-        else {
-            styles[key] = initialStyles[key];
-        }
-        return styles;
-    }, {});
+const parseAtRule = (key, ctx) => {
+    return ctx?.media?.[key.slice(1)] ? `@media ${ctx.media[key.slice(1)]}` : key;
 };
 
 // Transform a selector rule
-const transformSelector = (selector, initialStyles, theme, vars) => {
-    if (initialStyles && Array.isArray(initialStyles)) {
-        return initialStyles.map(s => transformSelector(selector, s, theme, {...vars})).flat();
+const transformSelector = (selector, styles, ctx) => {
+    if (styles && Array.isArray(styles)) {
+        return styles.map(s => transformSelector(selector, s, ctx)).flat();
     }
     const result = [""];
-    const styles = parseStyles(initialStyles || {}, theme);
     Object.keys(styles)
         .filter(key => {
-            if (key.startsWith("$")) {
-                vars[key.replace("$", "")] = styles[key];
-                return false; // skip this
-            }
             // Skip content in the 'variants' key: reserved only to register variants
             // Skip null values
             return key !== "variants" && styles[key] !== null;
@@ -162,21 +104,21 @@ const transformSelector = (selector, initialStyles, theme, vars) => {
             // Nested styles or @media rules 
             if (typeof value === "object") {
                 // Media rules styles should be wrapped into a new rule
-                if (key.startsWith("@media")) {
+                if (key.startsWith("@")) {
                     return result.push(
-                        wrapRule(key, transformSelector(selector, value, theme, {...vars}), ""),
+                        wrapRule(parseAtRule(key, ctx), transformSelector(selector, value, ctx), ""),
                     );
                 }
                 // Add nested styles
                 // We should replace the & with the current selector
                 return result.push(
-                    transformSelector(key.replaceAll("&", selector), value, theme, {...vars}),
+                    transformSelector(key.replaceAll("&", selector), value, ctx),
                 );
             }
             // Just parse as a simple property
-            parseProp(key, theme).forEach(prop => {
+            parseProp(key, ctx).forEach(prop => {
                 const p = prop.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`);
-                result[0] = result[0] + `${p}:${parseValue(prop, value, theme, vars)};`;
+                result[0] = result[0] + `${p}:${parseValue(prop, value, ctx)};`;
             });
         });
     // result[0] contains the styles for the current selector, and should be wrapped into {}
@@ -187,29 +129,29 @@ const transformSelector = (selector, initialStyles, theme, vars) => {
 };
 
 // Transform a styles object to string
-export const transform = (styles, theme) => {
+export const transform = (styles, ctx) => {
     const result = Object.entries(styles || {}).map(([key, value]) => {
         if (key.startsWith("@")) {
-            const atRule = theme?.media?.[key.slice(1)] ? `@media ${theme.media[key.slice(1)]}` : key;
             // Check for @import rule, just add one @import for each source
             // value must be a string or an array of strings
-            if (atRule === "@import") {
+            if (key === "@import") {
                 return [value].flat().map(v => `@import ${v};`);
             }
             // Check for @font-face rule (or alias)
-            else if (atRule === "@font-face" || atRule === "@fontface" || atRule === "@fontFace") {
-                return transformSelector("@font-face", value, theme, {});
+            else if (key === "@font-face" || key === "@fontface" || key === "@fontFace") {
+                return transformSelector("@font-face", value, ctx);
             }
             // Other rule (for example @media or @keyframes)
-            else if (atRule.startsWith("@media") || atRule.startsWith("@keyframes")) {
+            // else if (key.startsWith("@media") || key.startsWith("@keyframes")) {
+            else {
                 const rules = Object.keys(value).map(k => {
-                    return transformSelector(k, value[k], theme, {});
+                    return transformSelector(k, value[k], ctx);
                 });
-                return wrapRule(atRule, rules.join(" "));
+                return wrapRule(parseAtRule(key, ctx), rules.join(" "));
             }
         }
         // Other value --> parse as regular classname
-        return transformSelector(key, value, theme, {});
+        return transformSelector(key, value, ctx);
     });
     return result.flat(2);
 };
@@ -235,11 +177,13 @@ const createVirtualSheet = () => {
 };
 
 // Create UniCSS instance
-const create = options => {
+export const create = options => {
     const context = {
         key: options?.key || "",
         theme: options.theme || {},
-        pragma: options.pragma || null,
+        media: options.media || {},
+        aliases: options.aliases || {},
+        createElement: options.pragma || null,
     };
     const inserted = new Set();
     const sheet = isBrowser ? createSheet() : createVirtualSheet();
@@ -262,13 +206,13 @@ const create = options => {
     const _css = (styles, isGlobal = false, isKeyframes = false) => {
         let rules = null;
         if (isGlobal) {
-            rules = transform(styles, context.theme);
+            rules = transform(styles, context);
         }
         else if (isKeyframes) {
-            rules = transform({"@keyframes __uni__": styles}, context.theme);
+            rules = transform({"@keyframes __uni__": styles}, context);
         }
         else {
-            rules = transform({".__uni__": styles}, context.theme);
+            rules = transform({".__uni__": styles}, context);
         }
 
         const hash = hashify(rules.join("\n"));
@@ -291,12 +235,11 @@ const create = options => {
                 ...initialCss,
                 ...customCss,
             });
-            const newProps = {
+
+            return context.createElement(as || type || "div", {
                 ...rest,
                 className: classNames(props?.className, className),
-            };
-
-            return context.pragma(as || type || "div", newProps);
+            });
         };
     };
     
@@ -306,9 +249,11 @@ const create = options => {
         keyframes: styles => _css(styles, false, true),
         styled: (type, styles) => _createStyledElement(type, styles),
         extractCss: () => sheet.cssRules.map(rule => rule.cssText).join("\n"),
-        configure: newOptions => {
-            context.theme = newOptions.theme || context.theme || {};
-            context.pragma = newOptions.pragma || context.pragma || null;
+        configure: opt => {
+            context.theme = opt.theme || context.theme || {};
+            context.media = opt.media || context.media || {};
+            context.aliases = opt.aliases || context.aliases || {};
+            context.createElement = opt.pragma || context.createElement;
         },
     };
 };

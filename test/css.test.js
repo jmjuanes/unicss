@@ -1,4 +1,4 @@
-import {configure, css, globalCss, keyframes, extractCss} from "../packages/unicss/index.js";
+import {configure, css, globalCss, keyframes, extractCss} from "../index.js";
 
 configure({
     key: "test/css",
@@ -27,10 +27,10 @@ describe("css", () => {
         expect(extractCss()).toEqual(expect.stringContaining(`.${element2} {color: white;}`));
     });
 
-    it("should use theme", () => {
+    it("should apply theme", () => {
         const element = css({
-            borderColor: "$colors.secondary",
-            color: "$colors.primary!important",
+            borderColor: t => t.colors.secondary,
+            color: t => `${t.colors.primary}!important`,
         });
 
         expect(extractCss()).toEqual(

@@ -1,23 +1,21 @@
-import {transform} from "../packages/unicss/index.js";
+import {transform} from "../index.js";
 
 describe("transform", () => {
-    const theme = {
+    const context = {
         media: {
             mobile: "(min-width: 900px)",
         },
-        colors: {
-            primary: "__primary",
-            secondary: "__secondary",
-        },
-        mapping: {
-            backgroundColor: "colors",
-            color: "colors"
+        theme: {
+            colors: {
+                primary: "__primary",
+                secondary: "__secondary",
+            },
         },
         aliases: {
             size: ["height", "width"],
         },
     };
-    const generateRules = css => transform(css, theme);
+    const generateRules = css => transform(css, context);
 
     it("should apply custom aliases", () => {
         const rules = generateRules({
@@ -29,41 +27,16 @@ describe("transform", () => {
         expect(rules[0]).toEqual(".test {height:1px;width:1px;}");
     });
 
-    it("should apply theme tokens", () => {
+    it("should apply theme", () => {
         const rules = generateRules({
             ".test": {
-                backgroundColor: "$secondary",
-                color: "$primary",
+                backgroundColor: t => t.colors.secondary,
+                color: t => t.colors.primary,
             },
         });
 
         expect(rules[0]).toEqual(
             ".test {background-color:__secondary;color:__primary;}",
-        );
-    });
-
-    it("should apply theme tokens from path", () => {
-        const rules = generateRules({
-            test: {
-                border: "2px solid $colors.primary",
-            },
-        });
-
-        expect(rules[0]).toEqual(
-            "test {border:2px solid __primary;}",
-        );
-    });
-
-    it("should apply local tokens", () => {
-        const rules = generateRules({
-            test: {
-                "$bg": "__bg",
-                backgroundColor: "$bg!important",
-            },
-        });
-
-        expect(rules[0]).toEqual(
-            "test {background-color:__bg!important;}",
         );
     });
 
@@ -74,18 +47,6 @@ describe("transform", () => {
                 "@mobile": {
                     color: "black"
                 },
-            },
-        });
-
-        expect(rules[0]).toEqual("test {color:white;}");
-        expect(rules[1]).toEqual("@media (min-width: 900px) {test {color:black;}}");
-    });
-
-    it("should apply custom media queries to individual properties", () => {
-        const rules = generateRules({
-            test: {
-                color: "white",
-                "@mobile:color": "black",
             },
         });
 

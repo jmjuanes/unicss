@@ -1,4 +1,4 @@
-import {configure, styled, extractCss} from "../packages/unicss/index.js";
+import {configure, styled, extractCss} from "../index.js";
 
 const pragma = jest.fn((tag, props) => ({tag, props}));
 configure({
@@ -39,7 +39,7 @@ describe("styled", () => {
 
     it("should support custom themes", () => {
         const vnode = styled("div", {
-            backgroundColor: "$colors.bg",
+            backgroundColor: t => t.colors.bg,
         })({});
 
         expect(vnode.props.className).toEqual(expect.stringContaining("uni-"));
