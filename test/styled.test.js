@@ -45,4 +45,20 @@ describe("styled", () => {
         expect(vnode.props.className).toEqual(expect.stringContaining("uni-"));
         expect(extractCss()).toEqual(expect.stringContaining("background-color: styled__bg;"));
     });
+
+    it("should support variants", () => {
+        const component = styled("div", {
+            color: "white",
+            variants: {
+                default: {
+                    fontSize: "16px",
+                },
+            },
+        });
+        const vnode = component({variant: "default"});
+
+        expect(extractCss()).toEqual(
+            expect.stringContaining("color: white; font-size: 16px;"),
+        );
+    });
 });
