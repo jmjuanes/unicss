@@ -162,11 +162,11 @@ const createRules = (styles, ctx, isGlobal, isKeyframes) => {
     }
 };
 
-const createSheet = () => {
-    let target = document.querySelector(`[data-source="unicss"`);
+const createSheet = key => {
+    let target = document.querySelector(`[data-unicss="${key}"`);
     if (!target) {
         target = document.createElement("style");
-        target.dataset.source = "unicss";
+        target.dataset.unicss = `${key}`;
         document.head.appendChild(target);
     }
     return target.sheet;
@@ -183,7 +183,7 @@ const createVirtualSheet = () => {
 };
 
 // Create UniCSS instance
-export const create = options => {
+export const createInstance = options => {
     const ctx = {
         key: options?.key || "",
         theme: options.theme || {},
@@ -192,7 +192,7 @@ export const create = options => {
         pragma: options.pragma || null,
     };
     const inserted = new Set();
-    const sheet = isBrowser ? createSheet() : createVirtualSheet();
+    const sheet = isBrowser ? createSheet(ctx.key) : createVirtualSheet();
 
     // Hydrate current sheet
     if (isBrowser && sheet.cssRules.length > 0) {
@@ -224,7 +224,7 @@ export const create = options => {
 
     const _createStyledElement = (type, initialCss) => {
         return props => {
-            const {as, css: customCss, ...rest} = props;
+            const {as, css: customCss, variants, ...rest} = props;
             const className = _css({
                 boxSizing: "border-box",
                 minWidth: "0",
@@ -253,11 +253,4 @@ export const create = options => {
     };
 };
 
-export const {
-    configure,
-    extractCss,
-    styled,
-    css,
-    globalCss,
-    keyframes,
-} = create({});
+export const {configure, extractCss, styled, css, globalCss, keyframes} = createInstance({});
