@@ -1,6 +1,6 @@
 {
     "name": "unicss",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "description": "The universal CSS-In-JS microlibrary",
     "author": "Josemi Juanes <hello@josemi.xyz>",
     "license": "MIT",
