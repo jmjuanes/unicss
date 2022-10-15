@@ -2,9 +2,6 @@ import {transform} from "../index.js";
 
 describe("transform", () => {
     const context = {
-        media: {
-            mobile: "(min-width: 900px)",
-        },
         theme: {
             colors: {
                 primary: "__primary",
@@ -38,20 +35,6 @@ describe("transform", () => {
         expect(rules[0]).toEqual(
             ".test {background-color:__secondary;color:__primary;}",
         );
-    });
-
-    it("should apply custom media queries", () => {
-        const rules = generateRules({
-            test: {
-                color: "white",
-                "@mobile": {
-                    color: "black"
-                },
-            },
-        });
-
-        expect(rules[0]).toEqual("test {color:white;}");
-        expect(rules[1]).toEqual("@media (min-width: 900px) {test {color:black;}}");
     });
 
     it("should apply global @media", () => {
