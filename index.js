@@ -224,11 +224,12 @@ export const createInstance = options => {
 
     const _createStyledElement = (type, initialCss) => {
         return props => {
-            const {as, css: customCss, variants, ...rest} = props;
+            const {as, css: customCss, variant, ...rest} = props;
+            const hasVariant = variant && initialCss?.variants?.[variant];
             const className = _css({
                 boxSizing: "border-box",
                 minWidth: "0",
-                ...initialCss,
+                ...(hasVariant ? merge(initialCss, initialCss.variants[variant]) : initialCss),
                 ...customCss,
             });
 
