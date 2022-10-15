@@ -83,44 +83,39 @@ const parseValue = (prop, value, ctx) => {
     return value;
 };
 
-const parseAtRule = (key, ctx) => {
-    return ctx?.media?.[key.slice(1)] ? `@media ${ctx.media[key.slice(1)]}` : key;
-};
-
 // Transform a selector rule
 const transformSelector = (selector, styles, ctx) => {
     if (styles && Array.isArray(styles)) {
         return styles.map(s => transformSelector(selector, s, ctx)).flat();
     }
     const result = [""];
-    Object.keys(styles)
-        .filter(key => {
-            // Skip content in the 'variants' key: reserved only to register variants
-            // Skip null values
-            return key !== "variants" && styles[key] !== null;
-        })
-        .forEach(key => {
-            const value = styles[key];
-            // Nested styles or @media rules 
-            if (typeof value === "object") {
-                // Media rules styles should be wrapped into a new rule
-                if (key.startsWith("@")) {
-                    return result.push(
-                        wrapRule(parseAtRule(key, ctx), transformSelector(selector, value, ctx), ""),
-                    );
-                }
-                // Add nested styles
-                // We should replace the & with the current selector
+    Object.keys(styles).forEach(key => {
+        // Skip content in the 'variants' key: reserved only to register variants
+        // Skip null values
+        if (key === "variants" || styles[key] === null) {
+            return;
+        }
+        const value = styles[key];
+        // Nested styles or @media rules 
+        if (typeof value === "object") {
+            // Media rules styles should be wrapped into a new rule
+            if (key.startsWith("@")) {
                 return result.push(
-                    transformSelector(key.replaceAll("&", selector), value, ctx),
+                    wrapRule(key, transformSelector(selector, value, ctx), ""),
                 );
             }
-            // Just parse as a simple property
-            parseProp(key, ctx).forEach(prop => {
-                const p = prop.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`);
-                result[0] = result[0] + `${p}:${parseValue(prop, value, ctx)};`;
-            });
+            // Add nested styles
+            // We should replace the & with the current selector
+            return result.push(
+                transformSelector(key.replaceAll("&", selector), value, ctx),
+            );
+        }
+        // Just parse as a simple property
+        parseProp(key, ctx).forEach(prop => {
+            const p = prop.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`);
+            result[0] = result[0] + `${p}:${parseValue(prop, value, ctx)};`;
         });
+    });
     // result[0] contains the styles for the current selector, and should be wrapped into {}
     if (result[0].length > 0) {
         result[0] = wrapRule(selector, result[0], "");
@@ -142,18 +137,29 @@ export const transform = (styles, ctx) => {
                 return transformSelector("@font-face", value, ctx);
             }
             // Other rule (for example @media or @keyframes)
-            // else if (key.startsWith("@media") || key.startsWith("@keyframes")) {
-            else {
+            else if (key.startsWith("@media") || key.startsWith("@keyframes")) {
                 const rules = Object.keys(value).map(k => {
                     return transformSelector(k, value[k], ctx);
                 });
-                return wrapRule(parseAtRule(key, ctx), rules.join(" "));
+                return wrapRule(key, rules.join(" "));
             }
         }
         // Other value --> parse as regular classname
         return transformSelector(key, value, ctx);
     });
     return result.flat(2);
+};
+
+const createRules = (styles, ctx, isGlobal, isKeyframes) => {
+    if (isGlobal) {
+        return transform(styles, ctx);
+    }
+    else if (isKeyframes) {
+        return transform({"@keyframes __uni__": styles}, ctx);
+    }
+    else {
+        return transform({".__uni__": styles}, ctx);
+    }
 };
 
 const createSheet = () => {
@@ -178,12 +184,12 @@ const createVirtualSheet = () => {
 
 // Create UniCSS instance
 export const create = options => {
-    const context = {
+    const ctx = {
         key: options?.key || "",
         theme: options.theme || {},
         media: options.media || {},
         aliases: options.aliases || {},
-        createElement: options.pragma || null,
+        pragma: options.pragma || null,
     };
     const inserted = new Set();
     const sheet = isBrowser ? createSheet() : createVirtualSheet();
@@ -204,17 +210,7 @@ export const create = options => {
     }
 
     const _css = (styles, isGlobal = false, isKeyframes = false) => {
-        let rules = null;
-        if (isGlobal) {
-            rules = transform(styles, context);
-        }
-        else if (isKeyframes) {
-            rules = transform({"@keyframes __uni__": styles}, context);
-        }
-        else {
-            rules = transform({".__uni__": styles}, context);
-        }
-
+        const rules = createRules(styles, ctx, isGlobal, isKeyframes);
         const hash = hashify(rules.join("\n"));
         if (!inserted.has(hash)) {
             sheet.insertRule(`--uni {--uni:'${hash}';}`, sheet.cssRules.length);
@@ -236,7 +232,7 @@ export const create = options => {
                 ...customCss,
             });
 
-            return context.createElement(as || type || "div", {
+            return ctx.pragma(as || type || "div", {
                 ...rest,
                 className: classNames(props?.className, className),
             });
@@ -250,12 +246,18 @@ export const create = options => {
         styled: (type, styles) => _createStyledElement(type, styles),
         extractCss: () => sheet.cssRules.map(rule => rule.cssText).join("\n"),
         configure: opt => {
-            context.theme = opt.theme || context.theme || {};
-            context.media = opt.media || context.media || {};
-            context.aliases = opt.aliases || context.aliases || {};
-            context.createElement = opt.pragma || context.createElement;
+            ctx.theme = opt.theme || ctx.theme;
+            ctx.aliases = opt.aliases || ctx.aliases;
+            ctx.pragma = opt.pragma || ctx.pragma;
         },
     };
 };
 
-export const {configure, extractCss, styled, css, globalCss, keyframes} = create({});
+export const {
+    configure,
+    extractCss,
+    styled,
+    css,
+    globalCss,
+    keyframes,
+} = create({});
