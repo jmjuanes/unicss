@@ -199,6 +199,7 @@ Configure UniCSS for using your custom theme and the *pragma* function from the 
 
 - `pragma`: the proper *pragma* function to use.
 - `theme`: your custom theme object. 
+- `aliases`: your custom aliases map.
 
 Usually you should configure UniCSS only once in the entry file of your project.
 
